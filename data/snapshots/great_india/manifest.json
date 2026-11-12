@@ -1,0 +1,63 @@
+{
+  "source": "great_india",
+  "capture_method": "Fetched in a web browser (Claude desktop app browser pane) on 2026-11-12 because the build environment's network allow-list blocked direct HTTP. Pages were reduced to headings, paragraphs, lists and the 'Find out more' link; 'Why ...?' and 'Key subjects' marketing sections and testimonials were removed; wording was not changed.",
+  "robots_txt_checked": "2026-11-12: only /contact-us/thank-you and /newsletter/thank-you are disallowed",
+  "pages": {
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/india": {
+      "file": "india.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/anglia-ruskin-university": {
+      "file": "anglia-ruskin-university.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/norwich-university-arts": {
+      "file": "norwich-university-arts.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/queens-university-belfast": {
+      "file": "queens-university-belfast.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/royal-college-art": {
+      "file": "royal-college-art.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/royal-conservatoire-scotland": {
+      "file": "royal-conservatoire-scotland.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/royal-northern-college-music": {
+      "file": "royal-northern-college-music.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/university-bristol": {
+      "file": "university-bristol.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/trinity-laban": {
+      "file": "trinity-laban.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/university-dundee": {
+      "file": "university-dundee.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/university-kent": {
+      "file": "university-kent.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/university-reading": {
+      "file": "university-reading.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/university-surrey": {
+      "file": "university-surrey.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    },
+    "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/university-west-england": {
+      "file": "university-west-england.html",
+      "captured_at": "2026-11-12T10:00:00+00:00"
+    }
+  }
+}

@@ -2,10 +2,36 @@
 [browser]
 gatherUsageStats = false
 
+[client]
+toolbarMode = "minimal"
+
 [server]
 address = "localhost"
 headless = false
 
+# "Passport" palette: deep-ink sidebar, cool paper page, teal actions,
+# marigold reserved for urgent deadlines (see scholarpath/ui/style.py).
 [theme]
 base = "light"
-primaryColor = "#1f5fae"
+primaryColor = "#0E7C7B"
+backgroundColor = "#F6F8FB"
+secondaryBackgroundColor = "#EEF2F7"
+textColor = "#1B2233"
+linkColor = "#0B6463"
+borderColor = "#DCE2EC"
+font = "'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif"
+headingFont = "'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif"
+headingFontWeights = [780, 700, 680, 650, 600, 600]
+headingFontSizes = ["2.3rem", "1.5rem", "1.2rem", "1.05rem", "0.95rem", "0.875rem"]
+baseRadius = "0.7rem"
+buttonRadius = "0.6rem"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#EEF2F7"
+chartCategoricalColors = ["#0E7C7B"]
+
+[theme.sidebar]
+backgroundColor = "#14213D"
+secondaryBackgroundColor = "#1E2E52"
+textColor = "#E8EDF7"
+primaryColor = "#F2B632"
+borderColor = "#2B3D66"

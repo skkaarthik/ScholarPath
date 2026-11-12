@@ -52,6 +52,8 @@ class RuleResult:
     requirement: str
     status: str
     reason: str
+    kind: str = "automatic"       # "automatic" (structured rule) or "manual" (checklist item)
+    missing_input: bool = False   # unknown only because the student left this blank
 
 
 @dataclass
@@ -63,6 +65,32 @@ class MatchResult:
     @property
     def counts(self) -> dict[str, int]:
         return {s: sum(1 for r in self.rules if r.status == s) for s in (SATISFIED, FAILED, UNKNOWN)}
+
+    @property
+    def automatic(self) -> list[RuleResult]:
+        return [r for r in self.rules if r.kind == "automatic"]
+
+    @property
+    def manual(self) -> list[RuleResult]:
+        return [r for r in self.rules if r.kind == "manual"]
+
+    @property
+    def missing_inputs(self) -> list[RuleResult]:
+        return [r for r in self.automatic if r.missing_input]
+
+    @property
+    def group(self) -> str:
+        """Display group (the overall verdict is unchanged):
+
+        * "fit"     - every automatic check passed; only checklist items may remain
+        * "missing" - nothing failed, but some automatic checks could not run
+        * "no_fit"  - at least one recorded requirement failed
+        """
+        if self.overall == OVERALL_FAIL:
+            return "no_fit"
+        if any(r.status == UNKNOWN for r in self.automatic):
+            return "missing"
+        return "fit"
 
 
 def _same(a: str, b: str) -> bool:
@@ -104,15 +132,16 @@ def rule_nationality(profile: StudentProfile, rec: ScholarshipRecord) -> RuleRes
         req.kind, "Citizens of: " + ", ".join(req.values))
     student = _show(profile.nationality)
     if _missing(profile.nationality):
-        return RuleResult("Nationality", student, shown, UNKNOWN, "You did not provide a nationality.")
+        return RuleResult("Nationality", student, shown, UNKNOWN, "You didn't enter a citizenship, so this can't be checked.",
+                          missing_input=True)
     if req.kind == "unknown":
         return RuleResult("Nationality", student, shown, UNKNOWN,
-                          "The source's nationality rules are not recorded in a structured form.")
+                          "The source doesn't list eligible countries in a form ScholarPath can check.")
     if req.kind == "unrestricted":
-        return RuleResult("Nationality", student, shown, SATISFIED, "The source states no nationality restriction.")
+        return RuleResult("Nationality", student, shown, SATISFIED, "Open to every nationality.")
     if any(_same(profile.nationality, v) for v in req.values):
-        return RuleResult("Nationality", student, shown, SATISFIED, f"{profile.nationality} is on the recorded list.")
-    return RuleResult("Nationality", student, shown, FAILED, f"{profile.nationality} is not on the recorded list.")
+        return RuleResult("Nationality", student, shown, SATISFIED, f"{profile.nationality} is on the list of eligible countries.")
+    return RuleResult("Nationality", student, shown, FAILED, f"{profile.nationality} is not on the list of eligible countries.")
 
 
 def rule_exclusions(profile: StudentProfile, rec: ScholarshipRecord) -> RuleResult:
@@ -121,15 +150,16 @@ def rule_exclusions(profile: StudentProfile, rec: ScholarshipRecord) -> RuleResu
         exc.kind, "Not open to citizens of: " + ", ".join(exc.values))
     student = _show(profile.nationality)
     if _missing(profile.nationality):
-        return RuleResult("Nationality exclusions", student, shown, UNKNOWN, "You did not provide a nationality.")
+        return RuleResult("Nationality exclusions", student, shown, UNKNOWN, "You didn't enter a citizenship, so this can't be checked.",
+                          missing_input=True)
     if exc.kind == "unknown":
         return RuleResult("Nationality exclusions", student, shown, UNKNOWN,
-                          "Whether some nationalities are excluded is not recorded.")
+                          "The source doesn't say whether any nationalities are excluded.")
     if exc.kind == "list" and any(_same(profile.nationality, v) for v in exc.values):
         return RuleResult("Nationality exclusions", student, shown, FAILED,
-                          f"Citizens of {profile.nationality} are explicitly excluded.")
+                          f"The source says citizens of {profile.nationality} can't apply.")
     return RuleResult("Nationality exclusions", student, shown, SATISFIED,
-                      "Your nationality is not among the recorded exclusions.")
+                      "Your citizenship isn't excluded.")
 
 
 def _list_rule(name: str, student_value, req, labels: dict) -> RuleResult:
@@ -137,16 +167,16 @@ def _list_rule(name: str, student_value, req, labels: dict) -> RuleResult:
         req.kind, ", ".join(labels.get(v, v) for v in req.values))
     student = _show(student_value, labels)
     if _missing(student_value):
-        return RuleResult(name, student, shown, UNKNOWN, f"You did not provide a {name.lower()}.")
+        return RuleResult(name, student, shown, UNKNOWN, f"You didn't choose a {name.lower()}, so this can't be checked.",
+                          missing_input=True)
     if req.kind == "unknown":
-        return RuleResult(name, student, shown, UNKNOWN, f"The source's {name.lower()} rules are not recorded.")
+        return RuleResult(name, student, shown, UNKNOWN, f"The source doesn't list {name.lower()} options in a form ScholarPath can check.")
     if req.kind == "unrestricted":
-        return RuleResult(name, student, shown, SATISFIED, f"The source states any {name.lower()} is accepted.")
+        return RuleResult(name, student, shown, SATISFIED, f"Open to any {name.lower()}.")
     if student_value in req.values:
-        return RuleResult(name, student, shown, SATISFIED, f"{labels.get(student_value, student_value)} is listed.")
+        return RuleResult(name, student, shown, SATISFIED, f"{labels.get(student_value, student_value)} is accepted.")
     return RuleResult(name, student, shown, FAILED,
-                      f"{labels.get(student_value, student_value)} is not among the recorded options "
-                      "(different labels are never treated as equivalent).")
+                      f"{labels.get(student_value, student_value)} is not one of the accepted options.")
 
 
 def rule_score(profile: StudentProfile, rec: ScholarshipRecord) -> RuleResult | None:
@@ -155,15 +185,16 @@ def rule_score(profile: StudentProfile, rec: ScholarshipRecord) -> RuleResult | 
     scale_label = SCORE_SCALES[rec.score_scale]["label"]
     shown = f"At least {rec.min_score:g} ({scale_label})"
     if profile.score is None:
-        return RuleResult("Academic score", "(not provided)", shown, UNKNOWN, "You did not provide a score.")
+        return RuleResult("Academic score", "(not provided)", shown, UNKNOWN, "You didn't enter a score, so this can't be checked.",
+                          missing_input=True)
     student = f"{profile.score:g} ({SCORE_SCALES.get(profile.score_scale, {}).get('label', profile.score_scale)})"
     if profile.score_scale != rec.score_scale:
         return RuleResult("Academic score", student, shown, UNKNOWN,
-                          "Your score uses a different grading scale. ScholarPath does not convert between "
-                          "scales; check the provider's conversion rules.")
+                          "Your score is on a different grading scale. ScholarPath does not convert between "
+                          "scales, so check the provider's own conversion rules.")
     if profile.score >= rec.min_score:
-        return RuleResult("Academic score", student, shown, SATISFIED, "Meets the recorded minimum on the same scale.")
-    return RuleResult("Academic score", student, shown, FAILED, "Below the recorded minimum on the same scale.")
+        return RuleResult("Academic score", student, shown, SATISFIED, "Meets the minimum on the same scale.")
+    return RuleResult("Academic score", student, shown, FAILED, "Below the minimum on the same scale.")
 
 
 def evaluate(profile: StudentProfile, rec: ScholarshipRecord) -> MatchResult:
@@ -179,7 +210,8 @@ def evaluate(profile: StudentProfile, rec: ScholarshipRecord) -> MatchResult:
     for item in rec.manual_review_items:
         rules.append(RuleResult(
             f"Manual review ({item.category.replace('_', ' ')})", "-", item.text, UNKNOWN,
-            "ScholarPath cannot check this automatically; verify it yourself on the official page.",
+            "Confirm this yourself on the official page.",
+            kind="manual",
         ))
     statuses = {r.status for r in rules}
     if FAILED in statuses:

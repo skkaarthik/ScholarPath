@@ -10,9 +10,10 @@ from __future__ import annotations
 import streamlit as st
 
 from scholarpath import config
-from scholarpath.ui import applications, common, details, explore, insights, overview, profile_match
+from scholarpath.ui import applications, common, details, explore, insights, overview, profile_match, style
 
 st.set_page_config(page_title="ScholarPath", page_icon="🎓", layout="wide")
+style.inject()
 
 RENDERERS = {
     "Overview": overview.render,
@@ -24,12 +25,13 @@ RENDERERS = {
 }
 
 with st.sidebar:
-    st.markdown("## 🎓 ScholarPath")
+    style.brand()
+    st.radio("Menu", common.PAGES, key="page", format_func=common.page_label, label_visibility="collapsed")
+    st.divider()
     st.radio("Dataset", list(config.MODES), format_func=config.MODE_LABELS.get, key="mode",
              on_change=common.on_mode_change,
-             help="Each dataset has its own database, saved items and tracker.")
-    st.radio("Go to", common.PAGES, key="page")
-    st.caption("Single-user local app. Nothing is submitted to any scholarship provider.")
+             help="Each dataset has its own database, saved list and tracker.")
+    st.caption("Runs only on this computer. ScholarPath never submits anything to a scholarship provider.")
 
 svc = common.service()
 common.mode_banner(svc)

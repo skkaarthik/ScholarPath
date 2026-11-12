@@ -100,3 +100,15 @@ def test_start_tracking_twice_does_not_duplicate(example_service, example_record
     first = example_service.start_tracking(sid)
     second = example_service.start_tracking(sid)
     assert first.id == second.id and len(example_service.applications()) == 1
+
+
+def test_saving_without_changes_adds_no_history(example_service, example_records):
+    sid = by_key(example_records, "cedar-public-health")["id"]
+    example_service.start_tracking(sid)
+    example_service.update_application(sid, "preparing", notes="Draft SOP")
+    before = example_service.get_application(sid)
+    again = example_service.update_application(sid, "preparing", notes="Draft SOP")
+    assert again.updated_at == before.updated_at
+    assert len(example_service.application_history(sid)) == 2  # started + one real edit
+    example_service.update_application(sid, "preparing", notes="Draft SOP", history_note="Re-checked")
+    assert len(example_service.application_history(sid)) == 3  # an explicit note is still recorded

@@ -318,6 +318,8 @@ class ScholarPathService:
             row = repo.application_for(conn, scholarship_id)
             if row is None:
                 raise ServiceError("Start tracking this scholarship before editing it.")
+            if all(row[key] == value for key, value in values.items()) and not history_note.strip():
+                return _to_application(row)  # nothing changed: no write, no empty history entry
             repo.application_update(conn, row["id"], values, now)
             repo.history_insert(conn, row["id"], values, history_note or "Edited", now)
             row = repo.application_for(conn, scholarship_id)

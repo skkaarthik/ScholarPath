@@ -69,7 +69,12 @@ from mixing (`config.db_path`, `services.ensure_schema` mode guard, `dataset_ori
   needs manual verification; else matches.
 - **Why not convert GPA to percentage?** Conversions differ by institution and country; two
   4-point scales are not equivalent. Different scale → *unknown* with an explanation.
-- **Missing answer?** That rule is *unknown*, never satisfied.
+- **Missing answer?** That rule is *unknown*, never satisfied; it is flagged `missing_input` so the
+  UI can say which field to add.
+- **Why three result groups?** Real sources contain clauses no program can check (residence,
+  language). Showing each as a warning buried every result in caution. The verdict is unchanged,
+  but results whose automatic checks all pass are grouped as *Good fits* with a checklist, separate
+  from results where information is genuinely missing (`MatchResult.group`).
 - **Language tests, age, residence?** Manual-review items shown as *unknown* rules.
 - **Why no fuzzy matching or AI?** Eligibility errors are costly; exact, explainable rules are
   auditable and testable.
@@ -93,7 +98,7 @@ from mixing (`config.db_path`, `services.ensure_schema` mode guard, `dataset_ori
 
 ## Testing
 
-- `pytest` (≈120 tests, ~4 s): validation, parsers on fixtures and snapshots, safe writes, polite
+- `pytest` (126 tests, ~4 s): validation, parsers on fixtures and snapshots, safe writes, polite
   fetcher with fake HTTP, persistence across reopen, idempotency, rollback, migration, isolation,
   filters, sorting, boundaries, matching, CSV content and escaping, tracker rules, and Streamlit
   `AppTest` UI flows that check the database afterwards.

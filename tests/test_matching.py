@@ -142,3 +142,24 @@ def test_match_results_put_matches_first(example_service):
     order = [OVERALL_MATCH, OVERALL_MANUAL, OVERALL_FAIL]
     assert overall == sorted(overall, key=order.index)
     assert overall[0] == OVERALL_MATCH
+
+
+def test_display_groups_separate_checklists_from_missing_information(recs):
+    # Every automatic rule passes; only checklist items remain -> "fit" (verdict unchanged).
+    vega = evaluate(INDIAN_CS, recs["vega-cs-masters"])
+    assert vega.overall == OVERALL_MANUAL and vega.group == "fit"
+    assert [r.kind for r in vega.manual] == ["manual"] and not vega.missing_inputs
+    # Full match -> "fit".
+    assert evaluate(INDIAN_CS, recs["lakeshore-stem-excellence"]).group == "fit"
+    # Source does not structure nationality -> "missing", not caused by the student.
+    meridian = evaluate(StudentProfile(nationality="India", degree="phd", subject="natural_sciences"),
+                        recs["meridian-doctoral-fellowship"])
+    assert meridian.group == "missing" and not meridian.missing_inputs
+    # Blank student answers -> "missing", flagged as missing input.
+    blank = evaluate(StudentProfile(), recs["lakeshore-stem-excellence"])
+    assert blank.group == "missing"
+    assert {r.rule for r in blank.missing_inputs} == {"Nationality", "Nationality exclusions", "Degree",
+                                                        "Subject", "Academic score"}
+    # Any failure -> "no_fit".
+    assert evaluate(StudentProfile(nationality="India", degree="master", subject="medicine_health"),
+                    recs["cedar-public-health"]).group == "no_fit"

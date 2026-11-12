@@ -20,7 +20,9 @@ generate essays, send emails, store documents or convert currencies.
   manual-review items, official links and provenance (source, fetch time, verification status).
 - **Profile matching**: explainable rule-by-rule results - *satisfied / failed / unknown* - with an
   overall verdict of "Matches recorded requirements", "Needs manual verification" or
-  "Does not match recorded requirements". Missing information is never treated as a match.
+  "Does not match recorded requirements". Results are grouped into *Good fits*, *Need more info*
+  and *Not a fit*; things only you can confirm become a short checklist. Missing information is
+  never treated as a match.
 - **My applications**: shortlist, tracker (Interested → Preparing → Applied → Result received)
   with personal target dates, notes, corrections and change history, plus a deadline dashboard.
 - **Insights**: counts by host country, funding category and known deadline month.

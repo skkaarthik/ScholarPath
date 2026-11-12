@@ -21,7 +21,26 @@ Last updated: 2026-11-12. Branch: `feature/scholarpath-v1`.
 - Checks: full `pytest` suite - passing (persistence, rollback, migration, isolation,
   filters, boundaries, matching, CSV, tracker rules).
 
-## Phase 3 - UI and complete workflow: see below
+## Phase 3 - UI and complete workflow: DONE
+- `app.py` + `scholarpath/ui/`: Overview, Explore (filters, results, save, details, filtered CSV),
+  Profile matching (submitted form, validation, per-rule tables, separate deadline status),
+  Scholarship details (requirements, original wording, manual review, links, provenance,
+  save/track), My applications (deadline groups, shortlist, tracker form + history), Insights
+  (3 single-series charts, stated scope, table view).
+- Docs: README, DATA_DICTIONARY, SOURCES, ARCHITECTURE, DEMO_GUIDE, VIVA_PREPARATION,
+  CONTRIBUTIONS (template), AI_ASSISTANCE (template).
+
+## Verification performed (2026-11-12, Linux, Python 3.11.18, Streamlit 1.67.0)
+- `python -m pytest`: 121 passed (includes 9 Streamlit AppTest UI checks).
+- Clean-copy smoke test: deleted DBs → `init-examples` (15 inserted) → `import-real`
+  (16 inserted) → `streamlit run app.py` → `/_stcore/health` returned `ok`.
+- Headless Chrome (Playwright) against the running server: Overview → Explore → Save →
+  View details → Start tracking → My applications → Insights → Profile matching; afterwards
+  `python -m scholarpath status` showed saved=1, tracked=1 (writes reached SQLite).
+  Screenshots were reviewed; chart label truncation and low-contrast icons were fixed.
+- Repeat imports: 0 inserted / 15 and 16 unchanged.
+- Demo-guide profiles checked against `ScholarPathService.match` output.
+- Not performed: Windows/macOS runs, live HTTP collection, a browser test on the user's machine.
 
 ## Blockers and limitations
 - **Live HTTP collection not verified.** The build environment's network allow-list
@@ -34,4 +53,5 @@ Last updated: 2026-11-12. Branch: `feature/scholarpath-v1`.
 - No GitHub remote exists for this repository; pushes not possible (see final report).
 
 ## Deferred (optional) work
-- Compare up to three scholarships, document checklists, calendar export.
+Not started, and not shown in the UI: compare up to three scholarships, application document
+checklists, calendar (.ics) export. The required workflow was prioritised.

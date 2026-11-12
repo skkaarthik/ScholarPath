@@ -105,3 +105,11 @@ def test_rolling_and_unknown_are_never_open_or_expired():
 
 def test_clock_override_is_used_by_service(example_service):
     assert example_service.today() == date(2026, 11, 12)
+
+
+def test_sql_and_python_deadline_status_agree(example_service):
+    everything = example_service.search()
+    for status in ("open", "expired", "rolling", "unknown"):
+        via_sql = {v.record.id for v in example_service.search(SearchFilters(deadline_statuses=[status]))}
+        via_python = {v.record.id for v in everything if v.status == status}
+        assert via_sql == via_python, status

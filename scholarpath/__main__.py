@@ -131,7 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("collect", help="collect real scholarship pages into JSON")
     p.add_argument("--sources", nargs="+", choices=sorted(SOURCES), help="default: all configured sources")
-    p.add_argument("--from-snapshots", action="store_true", help="parse saved snapshots instead of live HTTP")
+    how = p.add_mutually_exclusive_group(required=True)
+    how.add_argument("--from-snapshots", action="store_true", help="parse saved snapshots in data/snapshots/ (offline)")
+    how.add_argument("--live", action="store_true", help="fetch the official pages over HTTP")
     p.add_argument("--allow-partial", action="store_true", help="merge results even if some pages failed")
     p.add_argument("--output", default=str(config.REAL_DATASET_FILE))
     p.set_defaults(func=cmd_collect)

@@ -1,0 +1,11 @@
+# Local single-user app: no telemetry, bind to this computer only.
+[browser]
+gatherUsageStats = false
+
+[server]
+address = "localhost"
+headless = false
+
+[theme]
+base = "light"
+primaryColor = "#1f5fae"

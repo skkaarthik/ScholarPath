@@ -42,6 +42,25 @@ Last updated: 2026-11-12. Branch: `feature/scholarpath-v1`.
 - Demo-guide profiles checked against `ScholarPathService.match` output.
 - Not performed: Windows/macOS runs, live HTTP collection, a browser test on the user's machine.
 
+## UI redesign (2026-11-12, after first delivery)
+- "Passport" theme: deep-ink gradient sidebar with logo mark, cool page, teal actions, marigold
+  for urgent deadlines; Plus Jakarta Sans (falls back to system fonts offline).
+- Overview hero with a flight-path motif and quick actions; "Closing soon" cards.
+- Card-based results everywhere with smooth hover lift, button transitions, toasts; motion off
+  when the OS asks for reduced motion; every text/background pair checked at WCAG AA (>= 4.5:1).
+- Profile matching regrouped into Good fits / Need more info / Not a fit
+  (`MatchResult.group`); blank answers produce a tip naming the fields to add; checklist items
+  are collapsed instead of shown as warnings. Verdict logic and wording unchanged.
+- Tracker: saving without changes no longer writes an empty history entry.
+- Requires Streamlit >= 1.50 (theme options, tab defaults, button widths).
+
+### Verification of the redesign
+- `python -m pytest`: 126 passed (12 Streamlit AppTest UI checks).
+- Headless Chrome walkthrough on a fresh database: hero → Explore (save 3, hover) → Details →
+  Start tracking → Tracker (Applied without date refused; Preparing saved) → Profile matching →
+  Insights → switch to Real sources (shortlist empty) → 390 px phone width. No browser console
+  errors; `scholarpath status` afterwards: example saved=3 tracked=1, real saved=0.
+
 ## Blockers and limitations
 - **Live HTTP collection not verified.** The build environment's network allow-list
   blocked the scholarship sites. Pages were captured with a browser on 2026-11-12,

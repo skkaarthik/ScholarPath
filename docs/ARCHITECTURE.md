@@ -119,7 +119,10 @@ selections (selected scholarship, match results, filters).
 academic score (only if the record has a numeric threshold) and one "manual review" rule per
 unresolved requirement. Each returns *student value, recorded requirement, status, reason*.
 Overall: any failed → "Does not match recorded requirements"; else any unknown →
-"Needs manual verification"; else "Matches recorded requirements". Preferred destination is
+"Needs manual verification"; else "Matches recorded requirements". For display only, each
+result also has a `group`: *fit* (every automatic rule passed; only checklist items remain),
+*missing* (an automatic rule could not run, because of a blank answer or unstructured source data)
+or *no_fit*. Preferred destination is
 applied as a host-country filter before matching, and deadline status is shown separately.
 
 ## Dates

@@ -10,7 +10,16 @@ Last updated: 2026-11-12. Branch: `feature/scholarpath-v1`.
 - Safe JSON writes: empty run = error, partial run = separate file, merge by stable ID.
 - Checks: `pytest tests/test_cleaning.py tests/test_collectors.py` - passing.
 
-## Phase 2 - Storage and application services: see below
+## Phase 2 - Storage and application services: DONE
+- `database.py`: per-operation connections, foreign keys, busy timeout, explicit
+  transactions, ordered migrations (v1 core, v2 history + import log) tracked by `user_version`.
+- `repository.py`: all parameterized SQL; normalized multivalued tables; combined filters.
+- `services.py`: validated idempotent imports (insert/update/unchanged/rejected), mode guard,
+  search, details, shortlist, tracker with status/date rules and history, dashboard, matching.
+- `matching.py`: deterministic per-rule explanations; `exports.py`: CSV with formula protection.
+- CLI: `python -m scholarpath init-examples | collect | import-real | status | backup | migrate`.
+- Checks: full `pytest` suite - passing (persistence, rollback, migration, isolation,
+  filters, boundaries, matching, CSV, tracker rules).
 
 ## Phase 3 - UI and complete workflow: see below
 

@@ -9,6 +9,7 @@ method returns.
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -16,13 +17,17 @@ from pathlib import Path
 from . import config, repository as repo
 from .cleaning import content_hash, validate_many
 from .config import Clock
-from .database import connect, migrate, schema_version, transaction
+from .database import DatabaseBusyError, connect, migrate, schema_version, transaction
 from .dates import dashboard_group, deadline_status
 from .matching import MatchResult, StudentProfile, evaluate
 from .models import TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord
 from .repository import SearchFilters
 
 MODE_TO_ORIGIN = {config.MODE_EXAMPLE: "example", config.MODE_REAL: "real_source"}
+
+
+# Storage failures the UI should report calmly instead of crashing (see ui/common.run_page).
+STORAGE_ERRORS = (DatabaseBusyError, sqlite3.Error)
 
 
 class ServiceError(ValueError):

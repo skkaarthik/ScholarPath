@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="ScholarPath">
+  <rect x="4" y="4" width="36" height="36" rx="8" fill="#343A8C"/>
+  <path d="M13 30 C 17 18, 25 14, 32 14" fill="none" stroke="#FBFAF6" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="13" cy="30" r="3" fill="#FBFAF6"/>
+  <circle cx="32" cy="14" r="3.4" fill="#F2B84B"/>
+</svg>

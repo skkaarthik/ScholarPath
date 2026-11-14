@@ -1,17 +1,19 @@
-"""Shared Streamlit helpers: dataset mode, service access, cached reads, safe rendering, cards.
+"""Shared Streamlit helpers: navigation, dataset mode, cached reads, safe rendering
+and the small set of reusable components every page is built from.
 
 UI modules call services only; no SQL, HTTP or JSON reads happen here.
 Cached reads are keyed by database path (so modes never share cache entries)
 and are cleared after every successful write.
 
-Rendering safety: untrusted text goes through ``md_escape`` (Markdown) or
-``html.escape`` (the few HTML snippets). Raw HTML from sources is never shown.
+Rendering safety: untrusted text always goes through ``md_escape`` before it
+reaches ``st.markdown``/headings, or ``badge_text`` inside a badge. No page
+renders raw HTML from data.
 """
 
 from __future__ import annotations
 
-import html
 import re
+from datetime import date, datetime
 
 import streamlit as st
 
@@ -20,35 +22,48 @@ from ..cleaning import is_http_url
 from ..dates import STATUS_LABELS, describe_deadline
 from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, ScholarshipRecord
 from ..repository import SearchFilters
-from ..services import ScholarPathService
+from ..services import STORAGE_ERRORS, ScholarPathService, ServiceError
 
-PAGES = ["Overview", "Explore", "Profile matching", "Scholarship details", "My applications", "Insights"]
-PAGE_ICONS = {
-    "Overview": ":material/home:",
-    "Explore": ":material/travel_explore:",
-    "Profile matching": ":material/fact_check:",
-    "Scholarship details": ":material/description:",
-    "My applications": ":material/assignment:",
-    "Insights": ":material/insights:",
+# slug -> (title in the menu, icon). "details" is reachable only from a card.
+PAGE_INFO = {
+    "home": ("Home", ":material/home:"),
+    "discover": ("Discover", ":material/search:"),
+    "fit": ("Check my fit", ":material/fact_check:"),
+    "applications": ("Saved & applications", ":material/bookmarks:"),
+    "insights": ("Insights", ":material/bar_chart:"),
+    "data": ("Data & sources", ":material/database:"),
+    "details": ("Scholarship details", ":material/description:"),
 }
 
-# Plain-text status labels (tables, CSV-like views). Words carry the meaning.
-STATUS_TEXT = {"open": "Open", "expired": "Expired", "rolling": "Rolling", "unknown": "Unknown"}
+# Plain-text labels (tables). Words carry the meaning, never colour alone.
+STATUS_TEXT = {"open": "Open", "expired": "Closed", "rolling": "Rolling", "unknown": "Not published"}
 RULE_TEXT = {"satisfied": "✓ Met", "failed": "✕ Not met", "unknown": "? To confirm"}
 
-# Overall verdicts keep the exact wording from matching.py; only the presentation differs.
 OVERALL_STYLE = {
-    "Matches recorded requirements": {"badge": "green", "icon": ":material/verified:", "group": "Good fits"},
-    "Needs manual verification": {"badge": "blue", "icon": ":material/checklist:", "group": "Check a few details"},
-    "Does not match recorded requirements": {"badge": "gray", "icon": ":material/block:", "group": "Not eligible"},
+    "Matches recorded requirements": {"badge": "green", "icon": ":material/verified:"},
+    "Needs manual verification": {"badge": "blue", "icon": ":material/help:"},
+    "Does not match recorded requirements": {"badge": "gray", "icon": ":material/block:"},
 }
 
-# Keys of temporary selections that must not survive a dataset switch.
-MODE_SCOPED_KEYS = ("selected_id", "match_results", "match_profile", "tracker_pick",
-                    "f_text", "f_hosts", "f_degrees", "f_subjects", "f_funding", "f_status", "f_sort")
+FILTER_KEYS = ("f_text", "f_hosts", "f_degrees", "f_subjects", "f_funding", "f_status")
+FIT_KEYS = ("m_nat", "m_nat_other", "m_dest", "m_degree", "m_subject", "m_score", "m_scale")
+# Widget values that should survive a visit to another page. Streamlit forgets the
+# value of any widget that is not drawn on the current page unless we keep it alive.
+PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_filters", "mode")
+# Temporary selections that must not survive a dataset switch.
+MODE_SCOPED_KEYS = FILTER_KEYS + FIT_KEYS + ("selected_id", "details_back", "match_results", "match_profile",
+                                             "tracker_pick", "f_sort", "f_page")
+PAGE_SIZE = 10
 
 
-# --- mode & navigation ----------------------------------------------------------
+# --- navigation and state -----------------------------------------------------------
+
+def keep_state() -> None:
+    """Called once at the top of app.py: keep filter/form values while other pages are open."""
+    for key in PERSIST_KEYS:
+        if key in st.session_state:
+            st.session_state[key] = st.session_state[key]
+
 
 def current_mode() -> str:
     return st.session_state.setdefault("mode", config.MODE_EXAMPLE)
@@ -59,19 +74,48 @@ def on_mode_change() -> None:
         st.session_state.pop(key, None)
 
 
-def go_to(page: str, scholarship_id: str | None = None) -> None:
-    """Button callback: switch page (and optionally the selected scholarship)."""
-    st.session_state["page"] = page
+def go_to(page: str, scholarship_id: str | None = None, back: str | None = None) -> None:
+    """Button callback: ask app.py to open another page (optionally a specific scholarship)."""
+    st.session_state["_goto"] = page
     if scholarship_id:
         st.session_state["selected_id"] = scholarship_id
-
-
-def page_label(page: str) -> str:
-    return f"{PAGE_ICONS[page]} {page}"
+        st.session_state["details_back"] = back or "discover"
 
 
 def service() -> ScholarPathService:
     return ScholarPathService(current_mode())
+
+
+def run_page(render) -> None:
+    """Draw one page; turn storage problems into a calm message with a way to recover."""
+    svc = service()
+    try:
+        render(svc)
+    except STORAGE_ERRORS as exc:
+        with st.container(border=True, key="page_error"):
+            st.error("ScholarPath couldn't read or write its database just now. Nothing was changed.",
+                     icon=":material/error:")
+            st.markdown("This usually means another ScholarPath window or command is using the database. "
+                        "Close it, then try again.")
+            st.caption(f"Technical detail: {md_escape(str(exc))}")
+            st.button("Try again", key="retry_page", icon=":material/refresh:", type="primary")
+
+
+def page_header(svc: ScholarPathService, title: str, intro: str = "") -> None:
+    """Same top of page everywhere: title, one-sentence purpose, which dataset is showing."""
+    st.title(title, anchor=False)
+    if intro:
+        st.markdown(intro)
+    dataset_notice(svc)
+
+
+def dataset_notice(svc: ScholarPathService) -> None:
+    if svc.mode == config.MODE_EXAMPLE:
+        st.markdown(":violet-badge[:material/science: Example data] Invented for practice, so don't apply to "
+                    "these. Switch to *Real sources* in the sidebar for collected scholarships.")
+    else:
+        st.markdown(":blue-badge[:material/public: Real sources] Collected from official pages on the dates "
+                    "shown. Details can change, so confirm on the official page before you apply.")
 
 
 def dataset_ready(svc: ScholarPathService) -> bool:
@@ -82,27 +126,14 @@ def dataset_ready(svc: ScholarPathService) -> bool:
             return True
     command = ("python -m scholarpath init-examples" if svc.mode == config.MODE_EXAMPLE
                else "python -m scholarpath import-real")
-    with st.container(border=True, key="setup_needed"):
-        st.markdown(f"#### :material/database: Set up the {config.MODE_LABELS[svc.mode].lower()}")
+    with st.container(border=True, key="card_setup_needed"):
+        st.header(f"Set up the {config.MODE_LABELS[svc.mode].lower()}", anchor=False)
         st.markdown("This dataset has no scholarships yet. In Terminal, inside the ScholarPath folder, run:")
-        st.code(command, language="bash")
-        st.markdown("Then reload this page. ScholarPath never swaps in the other dataset by itself.")
+        st.code(command, language=None)
+        st.markdown("Then choose **Check again**. ScholarPath never swaps in the other dataset by itself.")
+        st.button("Check again", key="setup_retry", icon=":material/refresh:", on_click=after_write)
         st.caption(f"Database file: {svc.db_path}")
     return False
-
-
-def mode_banner(svc: ScholarPathService) -> None:
-    """Clear, calm dataset label (static text only)."""
-    if svc.mode == config.MODE_EXAMPLE:
-        st.markdown(
-            '<div class="sp-banner sp-banner-example"><strong>Example data.</strong> Every scholarship here '
-            "is invented for practice, so don't apply to them. Switch to <em>Real sources</em> in the "
-            "sidebar for collected scholarships.</div>", unsafe_allow_html=True)
-    else:
-        st.markdown(
-            '<div class="sp-banner sp-banner-real"><strong>Real sources.</strong> Collected from official '
-            "pages on the date shown in each record. Details can change, so confirm on the official page "
-            "before you apply.</div>", unsafe_allow_html=True)
 
 
 def after_write() -> None:
@@ -110,7 +141,43 @@ def after_write() -> None:
     st.cache_data.clear()
 
 
-# --- cached reads (keyed by DB path + date, so modes and days never mix) ---------
+def flash() -> None:
+    """Show a one-off confirmation set by a callback (after the write committed)."""
+    message = st.session_state.pop("flash", None)
+    if message:
+        st.toast(message, icon=":material/check_circle:")
+    problem = st.session_state.pop("flash_error", None)
+    if problem:
+        st.error(problem, icon=":material/error:")
+
+
+# --- write actions shared by several pages (success is reported only after the commit) ----
+
+def _write(action, success: str) -> None:
+    try:
+        action()
+    except (ServiceError, *STORAGE_ERRORS) as exc:
+        st.session_state["flash_error"] = f"Not saved: {exc}"
+    else:
+        after_write()
+        st.session_state["flash"] = success
+
+
+def save(svc: ScholarPathService, scholarship_id: str, name: str) -> None:
+    _write(lambda: svc.save(scholarship_id), f"Saved “{name}”.")
+
+
+def unsave(svc: ScholarPathService, scholarship_id: str) -> None:
+    _write(lambda: svc.unsave(scholarship_id), "Removed from saved. Your tracker notes and history are kept.")
+
+
+def track(svc: ScholarPathService, scholarship_id: str) -> None:
+    _write(lambda: svc.start_tracking(scholarship_id),
+           "Tracking started. Update your progress under Saved & applications.")
+    st.session_state["tracker_pick"] = scholarship_id
+
+
+# --- cached reads (keyed by DB path + date, so modes and days never mix) -------------
 
 def _svc_for(db_path: str) -> ScholarPathService:
     mode = config.MODE_EXAMPLE if db_path == str(config.db_path(config.MODE_EXAMPLE)) else config.MODE_REAL
@@ -135,28 +202,32 @@ def cached_options(db_path: str) -> dict:
     return _svc_for(db_path).filter_options()
 
 
+def all_views(svc: ScholarPathService, sort: str = "deadline"):
+    return cached_search(str(svc.db_path), svc.today().isoformat(), filters_key(SearchFilters()), sort)
+
+
 def filters_key(f: SearchFilters) -> tuple:
     return (f.text, tuple(f.host_countries), tuple(f.degrees), tuple(f.subjects), tuple(f.funding),
             tuple(f.deadline_statuses))
 
 
-def explore_filters() -> SearchFilters:
-    """Current Explore selections (temporary UI state only)."""
+def discover_filters() -> SearchFilters:
+    """Current Discover selections (temporary UI state only)."""
     ss = st.session_state
     return SearchFilters(
-        text=ss.get("f_text", ""), host_countries=list(ss.get("f_hosts", [])), degrees=list(ss.get("f_degrees", [])),
-        subjects=list(ss.get("f_subjects", [])), funding=list(ss.get("f_funding", [])),
-        deadline_statuses=list(ss.get("f_status", [])),
+        text=ss.get("f_text") or "", host_countries=list(ss.get("f_hosts") or []),
+        degrees=list(ss.get("f_degrees") or []), subjects=list(ss.get("f_subjects") or []),
+        funding=list(ss.get("f_funding") or []), deadline_statuses=list(ss.get("f_status") or []),
     )
 
 
-# --- safe rendering ----------------------------------------------------------------
+# --- safe text -------------------------------------------------------------------------
 
 _MD_SPECIAL = re.compile(r"([\\`*_{}\[\]()#+\-.!|<>~$:])")
 
 
 def md_escape(text: str) -> str:
-    """Show untrusted text literally inside st.markdown (no links, emphasis, icons or LaTeX)."""
+    """Show untrusted text literally inside st.markdown (no links, emphasis, icons, HTML or LaTeX)."""
     return _MD_SPECIAL.sub(r"\\\1", text or "")
 
 
@@ -165,11 +236,23 @@ def badge_text(text: str) -> str:
     return re.sub(r"[\[\]\\`*_$:<>|]", " ", text or "").strip()
 
 
-def safe_link_button(label: str, url: str, key: str, **kwargs) -> None:
-    if is_http_url(url):
-        st.link_button(label, url, key=key, **kwargs)
-    else:
-        st.caption(f"{label}: link not shown (not a valid http/https address).")
+def fmt_date(value: date | None) -> str:
+    return f"{value.day} {value.strftime('%b %Y')}" if value else "-"
+
+
+def fmt_ts(value: str | None) -> str:
+    """ISO timestamp -> '12 Nov 2026, 10:00 UTC' (stored timestamps are UTC)."""
+    if not value:
+        return "-"
+    try:
+        stamp = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    return f"{fmt_date(stamp.date())}, {stamp.strftime('%H:%M')} UTC"
+
+
+def plural(count: int, word: str) -> str:
+    return f"{count} {word}{'' if count == 1 else 's'}"
 
 
 def restriction_text(kind: str, values: list[str], labels: dict | None = None) -> str:
@@ -198,6 +281,24 @@ def deadline_text(view, today) -> str:
         view.record.deadline_kind, view.record.deadline_date, today)
 
 
+def freshness_text(rec: ScholarshipRecord, today: date) -> str:
+    """When the information was read from its source, and whether a person has checked it."""
+    if rec.fetch_method == "fictional":
+        return "Fictional example record"
+    parts = []
+    try:
+        read_on = datetime.fromisoformat(rec.source_fetched_at or rec.collected_at).date()
+        age = (today - read_on).days
+        ago = "today" if age <= 0 else f"{plural(age, 'day')} ago"
+        parts.append(f"Source read {fmt_date(read_on)} ({ago})")
+    except ValueError:
+        parts.append("Source read date not recorded")
+    parts.append("checked by a person" if rec.manual_verified_at else "not yet checked by a person")
+    if rec.source_status == "unavailable":
+        parts.append("source page unavailable at last collection")
+    return " · ".join(parts)
+
+
 def status_label(status: str) -> str:
     return STATUS_LABELS.get(status, status)
 
@@ -206,23 +307,24 @@ def results_table(views, today) -> list[dict]:
     return [{
         "Scholarship": v.record.name,
         "Provider": v.record.provider,
-        "Host countries": ", ".join(v.record.host_countries),
-        "Degree": degree_text(v.record),
+        "Where": ", ".join(v.record.host_countries),
+        "Level": degree_text(v.record),
         "Funding": funding_text(v.record),
         "Deadline": deadline_text(v, today),
+        "Information": freshness_text(v.record, today),
     } for v in views]
 
 
-# --- cards and badges ------------------------------------------------------------
+# --- components --------------------------------------------------------------------------
 
 def deadline_badge(view) -> str:
     """Badge whose words carry the meaning; colour and icon only reinforce it."""
     status, days = view.status, view.days_left
     if status == "open" and days is not None and days <= 7:
-        text = "Closes today" if days == 0 else f"Closes in {days} day{'s' if days != 1 else ''}"
+        text = "Closes today" if days == 0 else f"Closes in {plural(days, 'day')}"
         return f":orange-badge[:material/alarm: {text}]"
     if status == "open":
-        return f":green-badge[:material/event_available: {days} days left]"
+        return f":green-badge[:material/event_available: Open · {days} days left]"
     if status == "expired":
         return ":gray-badge[:material/event_busy: Closed]"
     if status == "rolling":
@@ -235,7 +337,7 @@ def is_urgent(view) -> bool:
 
 
 def meta_badges(rec: ScholarshipRecord) -> str:
-    parts = [f":gray-badge[:material/public: {badge_text(', '.join(rec.host_countries))}]"]
+    parts = [f":gray-badge[:material/location_on: {badge_text(', '.join(rec.host_countries))}]"]
     if rec.degrees.kind == "list":
         parts.append(f":gray-badge[:material/school: {badge_text(degree_text(rec))}]")
     if rec.funding_category == "unknown":
@@ -245,27 +347,66 @@ def meta_badges(rec: ScholarshipRecord) -> str:
     return " ".join(parts)
 
 
-def card_header(view, today, show_date: bool = True) -> None:
-    """Name, provider and badges for a scholarship card (all text escaped)."""
-    rec = view.record
-    st.markdown(f'<div class="sp-card-title">{html.escape(rec.name)}</div>'
-                f'<div class="sp-provider">{html.escape(rec.provider)}</div>', unsafe_allow_html=True)
-    st.markdown(f"{deadline_badge(view)} {meta_badges(rec)}")
-    if show_date and rec.deadline_date:
-        prefix = "Closed on" if view.status == "expired" else "Deadline"
-        st.caption(f"{prefix} {rec.deadline_date.strftime('%d %b %Y').lstrip('0')}")
-
-
 def card(prefix: str, view):
-    """Bordered, hoverable container keyed by the stable record ID."""
-    key = f"card_{prefix}_{view.record.id}"
-    if is_urgent(view):
-        key = f"card_urgent_{prefix}_{view.record.id}"
-    return st.container(border=True, key=key)
+    """White bordered container keyed by the stable record ID."""
+    urgent = "urgent_" if is_urgent(view) else ""
+    return st.container(border=True, key=f"card_{urgent}{prefix}_{view.record.id}")
 
 
-def flash() -> None:
-    """Show a one-off confirmation set by a callback (after the write committed)."""
-    message = st.session_state.pop("flash", None)
-    if message:
-        st.toast(message, icon=":material/check_circle:")
+def card_summary(view, today, compact: bool = False) -> None:
+    """What is it, who offers it, where, what funding, when it closes, how fresh (all text escaped)."""
+    rec = view.record
+    st.subheader(md_escape(rec.name), anchor=False)
+    badges = deadline_badge(view) if compact else f"{deadline_badge(view)} {meta_badges(rec)}"
+    st.markdown(f"{md_escape(rec.provider)}\n\n{badges}")
+    if rec.deadline_date:
+        prefix = "Closed on" if view.status == "expired" else "Deadline"
+        line = f"{prefix} {fmt_date(rec.deadline_date)}"
+    else:
+        line = "No deadline date published"
+    st.caption(line if compact else f"{line} · {freshness_text(rec, today)}")
+
+
+def details_button(view, prefix: str, back: str, label: str = "View details", **kwargs) -> None:
+    st.button(label, key=f"{prefix}_det_{view.record.id}", on_click=go_to,
+              args=("details", view.record.id, back), icon=":material/arrow_forward:", **kwargs)
+
+
+def empty_state(key: str, title: str, body: str, action: str | None = None, target: str | None = None,
+                icon: str = ":material/arrow_forward:") -> None:
+    """Explain why a list is empty and offer the next step."""
+    with st.container(border=True, key=f"card_empty_{key}"):
+        st.subheader(title, anchor=False)
+        st.markdown(body)
+        if action and target:
+            st.button(action, key=f"empty_{key}_go", on_click=go_to, args=(target,), type="primary", icon=icon)
+
+
+def safe_link_button(label: str, url: str, key: str, **kwargs) -> None:
+    if is_http_url(url):
+        st.link_button(label, url, key=key, help="Opens the official website in a new tab", **kwargs)
+    else:
+        st.caption(f"{label}: link not shown (not a valid http/https address).")
+
+
+def paginate(items: list, key: str, size: int = PAGE_SIZE) -> tuple[list, int, int]:
+    """Slice ``items`` for the current page. Returns (page_items, page, page_count)."""
+    pages = max(1, -(-len(items) // size))
+    page = min(max(1, int(st.session_state.get(key, 1))), pages)
+    st.session_state[key] = page
+    return items[(page - 1) * size: page * size], page, pages
+
+
+def _turn(key: str, step: int) -> None:
+    st.session_state[key] = int(st.session_state.get(key, 1)) + step
+
+
+def pager(key: str, page: int, pages: int) -> None:
+    if pages <= 1:
+        return
+    with st.container(horizontal=True, vertical_alignment="center", horizontal_alignment="center", key=f"{key}_pager"):
+        st.button("Previous", key=f"{key}_prev", on_click=_turn, args=(key, -1), disabled=page <= 1,
+                  icon=":material/chevron_left:")
+        st.markdown(f"Page **{page}** of **{pages}**")
+        st.button("Next", key=f"{key}_next", on_click=_turn, args=(key, 1), disabled=page >= pages,
+                  icon=":material/chevron_right:", icon_position="right")

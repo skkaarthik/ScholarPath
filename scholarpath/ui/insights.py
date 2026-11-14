@@ -17,7 +17,7 @@ from ..models import FUNDING_CATEGORIES
 from ..repository import SearchFilters
 from . import common
 
-BAR_COLOR = "#0E7C7B"  # brand teal; single series, so no legend
+BAR_COLOR = "#343A8C"  # theme primary (ink indigo); single series, so no legend
 
 
 def _bar(df: pd.DataFrame, category: str, sort: str | list = "-x") -> alt.Chart:
@@ -28,37 +28,40 @@ def _bar(df: pd.DataFrame, category: str, sort: str | list = "-x") -> alt.Chart:
         .encode(
             x=alt.X("Scholarships:Q", title="Scholarships", axis=alt.Axis(tickMinStep=1, grid=True)),
             y=alt.Y(f"{category}:N", title=None, sort=sort, axis=alt.Axis(labelLimit=320)),
-            opacity=alt.condition(hover, alt.value(1.0), alt.value(0.78)),
+            opacity=alt.condition(hover, alt.value(1.0), alt.value(0.9)),
             tooltip=[alt.Tooltip(f"{category}:N"), alt.Tooltip("Scholarships:Q")],
         )
         .add_params(hover)
         .properties(height=alt.Step(30))
-        .configure_axis(gridColor="#E6EAF1", domainColor="#C9D1DE", labelColor="#4A5468", titleColor="#4A5468",
-                        labelFontSize=12, titleFontSize=12)
+        .configure_axis(gridColor="#E4E1D8", domainColor="#A8A397", labelColor="#3D3B47", titleColor="#3D3B47",
+                        labelFontSize=13, titleFontSize=13)
         .configure_view(strokeWidth=0)
+        .configure(background="#FFFFFF")
     )
 
 
 def _chart_card(title: str, df: pd.DataFrame, category: str, note: str, sort: str | list = "-x") -> None:
-    with st.container(border=True):
-        st.markdown(f"#### {title}")
+    with st.container(border=True, key=f"card_chart_{category.lower().replace(' ', '_')}"):
+        st.header(title, anchor=False)
         st.altair_chart(_bar(df, category, sort))
         st.caption(note)
 
 
 def render(svc) -> None:
-    st.title("Insights", anchor=False)
+    common.page_header(svc, "Insights", "A simple picture of what is in this dataset. Counts only, no predictions.")
     if not common.dataset_ready(svc):
         return
     today = svc.today()
-    use_filters = st.toggle("Use my Explore filters", key="ins_filters")
-    filters = common.explore_filters() if use_filters else SearchFilters()
+    use_filters = st.toggle("Only count scholarships that match my Discover filters", key="ins_filters")
+    filters = common.discover_filters() if use_filters else SearchFilters()
     views = common.cached_search(str(svc.db_path), today.isoformat(), common.filters_key(filters), "name")
-    scope = "your current Explore filters" if use_filters and not filters.is_empty() else "no filters, so every record"
+    scope = "your current Discover filters" if use_filters and not filters.is_empty() else "no filters, so every record"
     st.markdown(f"Showing **{len(views)} scholarships** from the *{config.MODE_LABELS[svc.mode]}* dataset, "
                 f"with {scope}.")
     if not views:
-        st.info("No scholarships match these filters. Turn the filter switch off to see everything.")
+        common.empty_state("insights", "No scholarships match your Discover filters",
+                           "Turn the switch above off to chart the whole dataset, or change the filters.",
+                           "Change filters in Discover", "discover", icon=":material/tune:")
         return
 
     hosts = Counter(c for v in views for c in v.record.host_countries)
@@ -82,8 +85,7 @@ def render(svc) -> None:
                     f"{len(views) - len(dated)} rolling or unpublished deadlines are left out.",
                     sort=sorted(months))
 
-    with st.expander("Table view of these charts", icon=":material/table_rows:"):
-        st.dataframe(host_df, hide_index=True)
-        st.dataframe(fund_df, hide_index=True)
-        if months:
-            st.dataframe(month_df, hide_index=True)
+    with st.expander("The same numbers as tables", icon=":material/table_rows:"):
+        for column, frame in zip(st.columns(3), [host_df, fund_df, month_df if months else None]):
+            if frame is not None:
+                column.dataframe(frame, hide_index=True)

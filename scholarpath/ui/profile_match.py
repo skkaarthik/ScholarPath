@@ -9,8 +9,6 @@ browser session and is never saved.
 
 from __future__ import annotations
 
-import html
-
 import pandas as pd
 import streamlit as st
 
@@ -23,12 +21,12 @@ OTHER = "__other__"
 
 
 GROUPS = {
-    "fit": {"title": "Good fits", "tile": "sp-tile-fit", "icon": ":material/verified:",
-            "blurb": "Pass every check ScholarPath can run"},
-    "missing": {"title": "Need more info", "tile": "sp-tile-missing", "icon": ":material/help_center:",
-                "blurb": "Nothing failed, but some rules couldn't be checked yet"},
-    "no_fit": {"title": "Not a fit", "tile": "sp-tile-no", "icon": ":material/block:",
-               "blurb": "At least one recorded requirement isn't met"},
+    "fit": {"title": "Good fits", "icon": ":material/verified:",
+            "blurb": "Pass every check ScholarPath can run."},
+    "missing": {"title": "Need more info", "icon": ":material/help:",
+                "blurb": "Nothing failed, but some rules couldn't be checked yet."},
+    "no_fit": {"title": "Not a fit", "icon": ":material/block:",
+               "blurb": "At least one recorded requirement isn't met."},
 }
 EMPTY_GROUP = {
     "fit": "No full fits yet. Filling in more of the form often moves scholarships here.",
@@ -75,56 +73,57 @@ def _result_card(view, match, today) -> None:
     open_auto = [r for r in auto if r.status == UNKNOWN]
 
     with common.card("m", view):
-        common.card_header(view, today, show_date=False)
-        st.markdown(f":{style['badge']}-badge[{style['icon']} {match.overall}]")
-        st.markdown(f'<p class="sp-why">{html.escape(_summary_line(match))}</p>', unsafe_allow_html=True)
-        if auto:
-            st.progress(len(met) / len(auto), text=f"{len(met)} of {len(auto)} automatic checks passed")
-        lines = [("sp-rule-no", "✕", r) for r in failed] + [("sp-rule-open", "?", r) for r in open_auto]
-        if lines:
-            st.markdown("".join(
-                f'<div class="sp-rule {cls}"><span aria-hidden="true">{mark}</span>'
-                f'<div><b>{html.escape(r.rule)}</b> {html.escape(r.reason)}</div></div>'
-                for cls, mark, r in lines), unsafe_allow_html=True)
+        text, actions = st.columns([4, 1.3], vertical_alignment="top")
+        with text:
+            common.card_summary(view, today)
+            st.markdown(f":{style['badge']}-badge[{style['icon']} {match.overall}]")
+            st.markdown(common.md_escape(_summary_line(match)))
+            if auto:
+                st.caption(f"{len(met)} of {len(auto)} automatic checks passed")
+            lines = [f"- ✕ **{common.md_escape(r.rule)}:** {common.md_escape(r.reason)}" for r in failed]
+            lines += [f"- ? **{common.md_escape(r.rule)}:** {common.md_escape(r.reason)}" for r in open_auto]
+            if lines:
+                st.markdown("\n".join(lines))
+        with actions:
+            common.details_button(view, "m", back="fit", width="stretch")
         if match.manual:
             with st.expander(f"Confirm on the official page ({len(match.manual)})", icon=":material/checklist:"):
                 st.caption("Part of the eligibility rules, but written in a way only you can check.")
-                for r in match.manual:
-                    st.markdown(f"- {common.md_escape(r.requirement)}")
+                st.markdown("\n".join(f"- {common.md_escape(r.requirement)}" for r in match.manual))
         with st.expander("Every rule, explained", icon=":material/list_alt:"):
             st.dataframe(pd.DataFrame([{
                 "Rule": r.rule, "You": r.student_value, "Recorded requirement": r.requirement,
                 "Result": common.RULE_TEXT[r.status], "Why": r.reason,
             } for r in match.rules]), hide_index=True)
-        st.button("Open details", key=f"m_open_{rec.id}", on_click=common.go_to,
-                  args=("Scholarship details", rec.id), icon=":material/visibility:")
 
 
 def render(svc) -> None:
-    st.title("Check your fit", anchor=False)
-    st.markdown('<p class="sp-hero-sub">Tell ScholarPath what you know. It compares your answers with the '
-                'requirements recorded for each scholarship and shows exactly why. Your answers stay in this '
-                'browser tab and are not saved.</p>', unsafe_allow_html=True)
+    common.page_header(svc, "Check my fit",
+                       "Tell ScholarPath what you know. It compares your answers with the requirements "
+                       "recorded for each scholarship and shows exactly why. Your answers stay in this "
+                       "browser tab and are not saved.")
     if not common.dataset_ready(svc):
         return
     options = common.cached_options(str(svc.db_path))
     nationality_options = [NOT_SET] + options["nationalities"] + [OTHER]
 
     with st.form("profile_form", border=True):
+        st.header("About you", anchor=False)
+        st.caption("Every field is optional. Anything left blank is treated as unknown, never as a match.")
         c1, c2 = st.columns(2, gap="large")
         nat = c1.selectbox("Your citizenship", nationality_options, key="m_nat",
                            format_func=lambda v: {NOT_SET: "Choose a country", OTHER: "Another country (type it below)"}.get(v, v))
-        other_nat = c1.text_input("Another country", key="m_nat_other", placeholder="e.g. Brazil",
+        other_nat = c1.text_input("If another country, type its name", key="m_nat_other", placeholder="e.g. Brazil",
                                   help="Used only when you choose 'Another country'. Matched by exact country name.")
-        dest = c1.selectbox("Where would you like to study? (optional)", [NOT_SET] + options["host_countries"],
+        dest = c1.selectbox("Where would you like to study?", [NOT_SET] + options["host_countries"],
                             key="m_dest", format_func=lambda v: v or "Anywhere",
                             help="Only narrows the list. It is not an eligibility rule.")
         degree = c2.selectbox("Degree you want to study", [NOT_SET] + list(DEGREES), key="m_degree",
                               format_func=lambda v: DEGREES.get(v, "Choose a degree"))
         subject = c2.selectbox("Subject area", [NOT_SET] + list(SUBJECTS), key="m_subject",
                                format_func=lambda v: SUBJECTS.get(v, "Choose a subject"))
-        s1, s2 = c2.columns(2)
-        score = s1.number_input("Academic score (optional)", min_value=0.0, max_value=100.0, value=None,
+        s1, s2 = c2.columns(2, vertical_alignment="bottom")
+        score = s1.number_input("Academic score", min_value=0.0, max_value=100.0, value=None,
                                 step=0.1, key="m_score", placeholder="e.g. 8.2")
         scale = s2.selectbox("Score scale", [NOT_SET] + list(SCORE_SCALES), key="m_scale",
                              format_func=lambda v: SCORE_SCALES[v]["label"] if v else "Choose a scale")
@@ -144,7 +143,8 @@ def render(svc) -> None:
                 st.error(error, icon=":material/error:")
             return
         st.session_state["match_profile"] = profile
-        st.session_state["match_results"] = svc.match(profile)
+        with st.spinner("Comparing your answers with each scholarship..."):
+            st.session_state["match_results"] = svc.match(profile)
 
     results = st.session_state.get("match_results")
     if results is None:
@@ -153,7 +153,8 @@ def render(svc) -> None:
         return
     profile = st.session_state["match_profile"]
     if not results:
-        st.info("No scholarships in this dataset are hosted in that destination. Try *Anywhere*.")
+        common.empty_state("fit_none", "No scholarships in that destination",
+                           "Nothing in this dataset is hosted there. Choose *Anywhere* above and check again.")
         return
 
     groups: dict[str, list] = {key: [] for key in GROUPS}
@@ -162,10 +163,10 @@ def render(svc) -> None:
     for items in groups.values():  # full matches first inside "Good fits", then by name
         items.sort(key=lambda pair: (pair[1].overall != "Matches recorded requirements", pair[0].record.name))
 
-    cols = st.columns(3, gap="medium")
-    for col, (key, meta) in zip(cols, GROUPS.items()):
-        col.markdown(f'<div class="sp-tile {meta["tile"]}"><b>{len(groups[key])}</b>'
-                     f'<strong>{meta["title"]}</strong><span>{meta["blurb"]}</span></div>', unsafe_allow_html=True)
+    st.header("Your results", anchor=False)
+    with st.container(horizontal=True, key="fit_metrics"):
+        for key, meta in GROUPS.items():
+            st.metric(meta["title"], len(groups[key]), border=True, help=meta["blurb"])
 
     blanks = sorted({FIELD_NAMES[f] for f, v in (("Nationality", profile.nationality), ("Degree", profile.degree),
                                                     ("Subject", profile.subject), ("Academic score", profile.score))
@@ -187,7 +188,6 @@ def render(svc) -> None:
             if not items:
                 st.caption(EMPTY_GROUP[key])
                 continue
-            columns = st.columns(2, gap="medium")
-            for index, (view, match) in enumerate(items):
-                with columns[index % 2]:
-                    _result_card(view, match, today)
+            st.caption(meta["blurb"])
+            for view, match in items:
+                _result_card(view, match, today)

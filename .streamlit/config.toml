@@ -9,29 +9,29 @@ toolbarMode = "minimal"
 address = "localhost"
 headless = false
 
-# "Passport" palette: deep-ink sidebar, cool paper page, teal actions,
-# marigold reserved for urgent deadlines (see scholarpath/ui/style.py).
+# "Ink on paper" design system (see docs/DESIGN_SYSTEM.md).
+# Everything visual that Streamlit can theme natively is set here, so
+# scholarpath/ui/style.py only needs a few lines of CSS.
 [theme]
 base = "light"
-primaryColor = "#0E7C7B"
-backgroundColor = "#F6F8FB"
-secondaryBackgroundColor = "#EEF2F7"
-textColor = "#1B2233"
-linkColor = "#0B6463"
-borderColor = "#DCE2EC"
-font = "'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif"
-headingFont = "'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif"
-headingFontWeights = [780, 700, 680, 650, 600, 600]
-headingFontSizes = ["2.3rem", "1.5rem", "1.2rem", "1.05rem", "0.95rem", "0.875rem"]
-baseRadius = "0.7rem"
-buttonRadius = "0.6rem"
+primaryColor = "#343A8C"                # ink indigo: actions, links, selected states
+backgroundColor = "#FBFAF6"             # warm paper
+secondaryBackgroundColor = "#F0EEE7"    # inputs, table headers
+textColor = "#121118"
+linkColor = "#2C3180"
+borderColor = "#A8A397"
+# System fonts only: nothing is downloaded, so the app looks the same offline.
+font = "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif"
+headingFont = "'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif"
+headingFontSizes = ["2.1rem", "1.45rem", "1.15rem", "1rem", "0.95rem", "0.875rem"]
+headingFontWeights = [700, 700, 700, 700, 600, 600]
+baseFontSize = 16
+baseRadius = "0.5rem"
+buttonRadius = "0.5rem"
 showWidgetBorder = true
-dataframeHeaderBackgroundColor = "#EEF2F7"
-chartCategoricalColors = ["#0E7C7B"]
+dataframeHeaderBackgroundColor = "#F0EEE7"
+chartCategoricalColors = ["#343A8C"]
 
 [theme.sidebar]
-backgroundColor = "#14213D"
-secondaryBackgroundColor = "#1E2E52"
-textColor = "#E8EDF7"
-primaryColor = "#F2B632"
-borderColor = "#2B3D66"
+backgroundColor = "#F7F5EF"
+secondaryBackgroundColor = "#ECE9E0"

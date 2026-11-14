@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="44" viewBox="0 0 220 44" role="img" aria-label="ScholarPath">
+  <rect x="2" y="4" width="36" height="36" rx="8" fill="#343A8C"/>
+  <path d="M11 30 C 15 18, 23 14, 30 14" fill="none" stroke="#FBFAF6" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="11" cy="30" r="3" fill="#FBFAF6"/>
+  <circle cx="30" cy="14" r="3.4" fill="#F2B84B"/>
+  <text x="48" y="30" font-family="'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif" font-size="23" font-weight="700" fill="#121118">ScholarPath</text>
+</svg>

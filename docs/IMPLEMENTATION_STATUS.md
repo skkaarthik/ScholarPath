@@ -61,6 +61,10 @@ Last updated: 2026-11-12. Branch: `feature/scholarpath-v1`.
   Insights → switch to Real sources (shortlist empty) → 390 px phone width. No browser console
   errors; `scholarpath status` afterwards: example saved=3 tracked=1, real saved=0.
 
+## Second interface redesign (2026-11-14)
+Supersedes the "passport" theme above. Plan, evidence and limits: `docs/UPGRADE_STATUS.md`;
+design rules: `docs/DESIGN_SYSTEM.md`. Requires Streamlit >= 1.67 (the version it was tested on).
+
 ## Blockers and limitations
 - **Live HTTP collection not verified.** The build environment's network allow-list
   blocked the scholarship sites. Pages were captured with a browser on 2026-11-12,

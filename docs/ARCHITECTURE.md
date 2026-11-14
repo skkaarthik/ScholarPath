@@ -14,7 +14,7 @@ flowchart LR
 
 | Module | Responsibility | Not allowed |
 |---|---|---|
-| `ui/*.py` | Navigation, forms, display, temporary selections in `st.session_state` | SQL, HTTP, reading JSON files, storing business data in session state |
+| `ui/*.py` | Pages for Streamlit's `st.navigation` menu, shared components (`common.py`), forms, display, temporary selections in `st.session_state` | SQL, HTTP, reading JSON files, storing business data in session state |
 | `services.py` | Operations used by UI and CLI; validation; transaction boundaries | Streamlit calls |
 | `repository.py` | Parameterized SQL only | Business rules |
 | `database.py` | Connections, foreign keys, busy timeout, transactions, migrations | Data-specific logic |

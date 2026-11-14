@@ -10,21 +10,27 @@ generate essays, send emails, store documents or convert currencies.
 
 ## Features
 
-- **Two isolated datasets**, each with its own SQLite database, shortlist and tracker:
+- **Two isolated datasets**, each with its own SQLite database, saved list and tracker:
   - *Example data (fictional)* - 15 invented scholarships for offline demos. Always labelled.
   - *Real sources (collected)* - 16 records parsed from official pages of the
     Commonwealth Scholarship Commission in the UK and British Council GREAT Scholarships (India).
-- **Explore**: text search plus host country, degree, subject, funding and deadline-status filters
-  (OR within a filter, AND across filters), sorting, and **CSV export of the filtered results**.
-- **Scholarship details**: funding, structured requirements, *original eligibility wording*,
-  manual-review items, official links and provenance (source, fetch time, verification status).
-- **Profile matching**: explainable rule-by-rule results - *satisfied / failed / unknown* - with an
+- **Home**: today's date, database-backed counts, your next deadlines and the three steps.
+- **Discover**: search plus country, level, subject, funding and deadline filters that stay
+  visible (OR within a filter, AND across filters), a plain-language summary of active filters,
+  sorting, 10 results per page, and **CSV export of the filtered results** (all pages).
+- **Scholarship details** (opened from any card, with a Back button): dates, funding, recorded
+  requirements, items to confirm on the official page, *original eligibility wording*, and
+  source and freshness (where it came from, when it was read, whether a person checked it).
+- **Check my fit**: explainable rule-by-rule results - *satisfied / failed / unknown* - with an
   overall verdict of "Matches recorded requirements", "Needs manual verification" or
   "Does not match recorded requirements". Results are grouped into *Good fits*, *Need more info*
   and *Not a fit*; things only you can confirm become a short checklist. Missing information is
   never treated as a match.
-- **My applications**: shortlist, tracker (Interested → Preparing → Applied → Result received)
-  with personal target dates, notes, corrections and change history, plus a deadline dashboard.
+- **Saved & applications**: deadline board (six non-overlapping groups), saved list, and a
+  tracker (Interested → Preparing → Applied → Result received) with personal target dates,
+  notes, corrections and change history.
+- **Data & sources**: sources, record counts, read times, verification count and the exact
+  refresh commands. Nothing is collected while you browse.
 - **Insights**: counts by host country, funding category and known deadline month.
 
 ## Architecture (short)

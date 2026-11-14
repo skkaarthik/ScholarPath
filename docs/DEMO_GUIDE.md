@@ -21,22 +21,24 @@ Without it, example deadlines are relative to the anchor date and real ones to t
 
 ## Script (≈5 minutes)
 
-1. **Overview (30 s)** - point to the *Example data* banner (every record is invented), the
-   hero quick actions and the database-backed counts. Hover a card: it lifts and outlines in teal.
-2. **Explore (60 s)** - filter Host country = *United Kingdom*, Funding = *Full* → 1 result
-   (Cedar Public Health). Clear filters. Filter Subject = *Computer science*: the Atlas short
-   course disappears (subject *unknown*), Aurora appears (*explicitly unrestricted*).
-   Download the CSV and mention provenance columns and formula-injection protection.
-3. **Details (45 s)** - open *Cedar Public Health Scholarship*: requirements table, manual-review
-   items, original wording, provenance. Click **Save to shortlist** and **Start tracking**
-   (a confirmation pops up in the corner).
-4. **Profile matching (75 s)** - use the profiles below. Results are grouped into *Good fits*
+1. **Home (30 s)** - point to the *Example data* label (every record is invented), the
+   database-backed counts and the three steps. The menu on the left is Streamlit's own navigation.
+2. **Discover (60 s)** - filter Country = *United Kingdom*, Funding = *Full* → 1 result
+   (Cedar Public Health); read the "Filtered by ..." line. Clear all filters. Filter Subject =
+   *Computer science*: the Atlas short course disappears (subject *unknown*), Aurora appears
+   (*explicitly unrestricted*). Show Next/Previous paging. Download the CSV and mention
+   provenance columns and formula-injection protection.
+3. **Details (45 s)** - choose **View details** on *Cedar Public Health Scholarship*: dates,
+   funding, source and freshness on the left; requirements, items to confirm and the original
+   wording on the right. Click **Save** and **Start tracking my application** (a confirmation
+   pops up in the corner). **Back to Discover** returns to the same filters and page.
+4. **Check my fit (75 s)** - use the profiles below. Results are grouped into *Good fits*
    (every automatic check passed; anything left is a short checklist), *Need more info* and
    *Not a fit*. The overall verdict wording on each card is unchanged.
-5. **My applications (45 s)** - Tracker: set status *Applied* without a date → validation error;
-   set *Preparing* with a target date → saved. Show the history. Deadlines tab: Cedar sits in
-   "Due today to 7 days".
-6. **Real data (30 s)** - switch the sidebar to *Real sources*: banner changes, the shortlist is
+5. **Saved & applications (45 s)** - Tracker tab: set status *Applied* without a date →
+   "Not saved yet" error; set *Preparing* with a target date → saved, and the table above
+   updates. Show the change history. Deadlines tab: Cedar sits in "Due today to 7 days".
+6. **Real data (30 s)** - switch the sidebar to *Real sources*: the label changes, the saved list is
    empty (isolated database). Open *Commonwealth Shared Scholarships* (deadline 8 Dec 2026,
    from the official page) and *Commonwealth Master's Scholarships* (deadline unknown because
    the page gives no year).

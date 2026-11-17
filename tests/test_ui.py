@@ -3,8 +3,8 @@
 These drive app.py headlessly against a temporary database and then verify,
 through a separate service object, that UI actions reached SQLite.
 Workflow covered: Find -> Filter -> Review -> Apply -> Confirm -> Applications,
-plus Saved, Check my fit and the other pages (CSV content is checked in
-test_exports_and_tracker.py).
+plus the menu, Saved, Check my fit and the other pages (CSV content is checked
+in test_exports_and_tracker.py).
 Pages are opened the same way the app's own buttons do it (common.go_to).
 """
 
@@ -79,6 +79,26 @@ def open_review(at: AppTest, scholarship_id: str, back: str = "find") -> AppTest
     return goto(at, "review")
 
 
+def menu_keys(at: AppTest) -> list[str]:
+    """Keys of the menu's containers as rendered (set in app.py), e.g. 'nav_find_current'."""
+    found = []
+
+    def walk(block) -> None:
+        key = getattr(getattr(block, "proto", None), "id", "").rpartition("-")[2]
+        if key.startswith("nav_"):
+            found.append(key)
+        for child in getattr(block, "children", {}).values():
+            walk(child)
+
+    walk(at.main)
+    return found
+
+
+def highlighted(at: AppTest) -> list[str]:
+    """Menu entries drawn as highlighted: 'find', 'saved', 'applications', 'more' or a More page."""
+    return [key[len("nav_"):-len("_current")] for key in menu_keys(at) if key.endswith("_current")]
+
+
 def test_missing_database_shows_setup_steps_without_fallback():
     at = run_app()
     assert "python -m scholarpath init-examples" in texts(at)
@@ -89,7 +109,7 @@ def test_missing_database_shows_setup_steps_without_fallback():
 def test_app_opens_on_find_scholarships(seeded):
     at = run_app()
     assert [t.value for t in at.title] == ["Find scholarships"]
-    assert "Example data:" in texts(at) and "15 scholarships" in texts(at)
+    assert "Example data" in texts(at) and "15 scholarships" in texts(at)
     assert not at.warning  # no alarming yellow banners on a normal page
 
 
@@ -126,7 +146,8 @@ def test_find_review_apply_track_flow(seeded, example_records):
     click(at, "r_view_app")  # step 4: the matching tracker entry
     assert [t.value for t in at.title] == ["Applications"]
     assert at.subheader[0].value == "Cedar Public Health Scholarship"
-    assert "**Applied** · submitted 12 Nov 2026" in texts(at)
+    assert ":blue-badge[Applied] submitted 12 Nov 2026" in texts(at)
+    assert "Next: when the provider replies" in texts(at)  # the next available step is spelled out
     assert [e.proto.expanded for e in at.expander if e.label == "Update status"] == [True]
 
     at = goto(at, "find")  # the search is still as the user left it
@@ -152,14 +173,19 @@ def test_tracker_updates_status_confirms_and_rejects_invalid_combinations(seeded
     at.text_area(key=f"t_notes_{sid}").input("Uploaded transcript")
     click(at, f"t_save_{sid}")
     assert not at.error and "Saved. Status: Result received." in texts(at)
-    assert "**Result received** · Waitlisted / reserve · submitted 10 Nov 2026" in texts(at)
+    assert ":green-badge[Result received] :orange-badge[Waitlisted / reserve] submitted 10 Nov 2026" in texts(at)
 
     reopened = ScholarPathService(config.MODE_EXAMPLE).get_application(sid)
     assert reopened.status == "result_received" and reopened.outcome == "waitlisted"
     assert reopened.target_date == date(2026, 11, 18) and reopened.notes == "Uploaded transcript"
 
+    history = at.dataframe[0].value  # the only table on the page: newest first, one date format
+    assert list(history["Status"]) == ["Result received", "Applied"]
+    assert list(history["Submitted"]) == ["10 Nov 2026", "10 Nov 2026"] and history["Target"][0] == "18 Nov 2026"
+
     click(at, f"t_save_{sid}")  # a second save with nothing changed writes nothing
-    assert any("Nothing to save" in e.value for e in at.error)
+    assert any("Nothing to save" in i.value for i in at.info) and not at.error
+    assert len(ScholarPathService(config.MODE_EXAMPLE).application_history(sid)) == 2
 
 
 def test_earlier_tracker_entries_are_kept_and_can_be_marked_applied(seeded, example_records):
@@ -168,7 +194,7 @@ def test_earlier_tracker_entries_are_kept_and_can_be_marked_applied(seeded, exam
     seeded.start_tracking(sid)
     seeded.update_application(sid, "preparing", notes="Draft essay")
     at = goto(run_app(), "applications")
-    assert "**Preparing**" in texts(at)
+    assert ":gray-badge[Preparing]" in texts(at) and "Next: apply on the provider's website" in texts(at)
     at = open_review(at, sid, back="applications")
     assert at.button(key="r_back").label == "Back to Applications"
     assert at.button(key="r_view_app").label.startswith("In Applications as Preparing")
@@ -196,7 +222,7 @@ def test_saving_is_optional_and_saved_scholarships_reopen_at_review(seeded, exam
     assert at.button(key="r_unsave") is not None  # the button now offers removal instead
 
     at = goto(at, "saved")
-    assert "Due in 8-30 days (1)" in texts(at)
+    assert "Closing in 8 to 30 days (1)" in texts(at)
     click(at, f"saved_rev_{sid}")
     assert "Vega Computer Science Master's Award" in [t.value for t in at.title]
     assert at.button(key="r_back").label == "Back to Saved"
@@ -291,7 +317,7 @@ def test_switching_dataset_isolates_saved_items_and_clears_selection(seeded, exa
     assert at.session_state["selected_id"] == example_records[0]["id"]
     at.sidebar.radio(key="mode").set_value(config.MODE_REAL).run()
     assert not at.exception
-    assert "Real sources:" in texts(at) and "Example data:" not in texts(at)
+    assert "Real sources" in texts(at) and "Example data" not in texts(at)
     assert "selected_id" not in at.session_state and "No scholarship selected" in texts(at)
     at = goto(at, "saved")
     assert "Nothing saved yet" in texts(at)
@@ -373,7 +399,7 @@ def test_review_without_a_selection_points_back_to_find(seeded):
 def test_data_page_reports_sources_and_honest_freshness(seeded):
     at = goto(run_app(), "data")
     metrics = {m.label: m.value for m in at.metric}
-    assert metrics["Records"] == "15" and metrics["Checked by a person"] == "0 of 15"
+    assert metrics["Records"] == "15" and metrics["Checked by hand"] == "0 of 15"
     assert "no automatic schedule" in texts(at) and "python -m scholarpath init-examples" in texts(at)
 
 
@@ -388,3 +414,325 @@ def test_database_failure_shows_recovery_message_not_a_traceback(seeded, monkeyp
     assert not at.exception
     assert any("couldn't read or write its database" in e.value for e in at.error)
     assert at.button(key="retry_page") is not None
+
+
+# --- menu: one highlighted entry on every page, including the hidden Review page ------------
+
+def test_menu_item_names_the_entry_to_highlight():
+    from scholarpath.ui import common
+
+    assert [common.menu_item(p) for p in ("find", "saved", "applications")] == ["find", "saved", "applications"]
+    assert {common.menu_item(p) for p in ("fit", "insights", "data")} == {common.MORE}
+    # Review is not in the menu: it highlights the page it was opened from.
+    assert common.menu_item("review", "saved") == "saved"
+    assert common.menu_item("review", "applications") == "applications"
+    assert common.menu_item("review", "fit") == common.MORE
+    assert common.menu_item("review", None) == common.menu_item("review", "nonsense") == "find"
+
+
+def test_menu_highlights_the_open_page_on_every_page(seeded):
+    at = run_app()
+    assert highlighted(at) == ["find"]  # the opening page, whose URL path is empty
+    for page, expected in [("saved", ["saved"]), ("applications", ["applications"]), ("fit", ["more", "fit"]),
+                           ("insights", ["more", "insights"]), ("data", ["more", "data"]), ("find", ["find"])]:
+        assert highlighted(goto(at, page)) == expected
+        at.run()  # a rerun on the same page keeps the same entry highlighted
+        assert highlighted(at) == expected
+
+
+def test_review_highlights_the_page_it_was_opened_from_and_back_returns_there(seeded, example_records):
+    sid = example_records[0]["id"]
+    seeded.save(sid)
+    seeded.mark_applied(sid, FIXED_TODAY)
+    at = run_app()
+    click(at, f"find_rev_{sid}")
+    assert highlighted(at) == ["find"] and at.button(key="r_back").label == "Back to results"
+
+    at = goto(at, "saved")
+    click(at, f"saved_rev_{sid}")
+    assert highlighted(at) == ["saved"]
+    click(at, "r_back")
+    assert [t.value for t in at.title] == ["Saved scholarships"] and highlighted(at) == ["saved"]
+
+    at = goto(at, "applications")
+    click(at, f"app_rev_{sid}")
+    assert highlighted(at) == ["applications"] and at.button(key="r_back").label == "Back to Applications"
+
+    at = open_review(at, sid, back="fit")
+    assert highlighted(at) == ["more"] and at.button(key="r_back").label == "Back to Check my fit"
+    click(at, "r_back")
+    assert [t.value for t in at.title] == ["Check my fit"]
+
+
+def test_more_menu_is_drawn_fresh_for_each_page_so_it_closes_after_a_choice(seeded):
+    """An open menu would swallow the next click. Its key includes the open page, so choosing
+    a page makes Streamlit draw a new, closed menu; a rerun on the same page keeps the same one."""
+    at = run_app()
+    assert "nav_more_menu_find" in menu_keys(at)
+    goto(at, "insights")
+    assert "nav_more_menu_insights" in menu_keys(at) and "nav_more_menu_find" not in menu_keys(at)
+    at.toggle(key="ins_filters").set_value(True).run()   # using the page does not replace the menu
+    assert "nav_more_menu_insights" in menu_keys(at)
+    assert [k for k in menu_keys(at) if k.startswith(("nav_fit", "nav_insights", "nav_data"))] == [
+        "nav_fit", "nav_insights_current", "nav_data"]   # all three destinations are inside it
+
+
+# --- Find: state kept across Review, paging, deadline wording --------------------------------
+
+def test_sort_and_page_are_restored_after_review(seeded):
+    at = run_app()
+    at.selectbox(key="f_sort").set_value("name").run()
+    click(at, "f_page_next")
+    shown = card_ids(at)
+    assert at.session_state["f_page"] == 2 and len(shown) == 5
+    click(at, f"find_rev_{shown[0]}")
+    click(at, "r_back")
+    assert at.selectbox(key="f_sort").value == "name" and at.session_state["f_page"] == 2
+    assert card_ids(at) == shown and "Showing 11 to 15 of 15" in texts(at)
+
+
+def test_changing_search_filter_or_sort_on_a_later_page_returns_to_page_one(seeded):
+    at = run_app()
+    for change in (lambda: at.selectbox(key="f_sort").set_value("provider"),
+                   lambda: at.text_input(key="f_text").input("a"),
+                   lambda: at.pills(key="f_status").set_value(["open"])):
+        click(at, "f_page_next") if at.session_state["f_page"] == 1 else None
+        assert at.session_state["f_page"] == 2
+        change().run()
+        assert at.session_state["f_page"] == 1 and not at.exception
+
+
+def test_clearing_filters_is_sent_to_the_browser_not_only_forgotten_by_the_server(seeded):
+    """The browser keeps its own copy of each widget value. Deleting the session key left that
+    copy in place, so the old search and filters came back on the next click. Clearing therefore
+    assigns the empty value, which Streamlit marks with ``set_value`` and sends to the browser."""
+    real = ScholarPathService(config.MODE_REAL)
+    real.import_records([real_record()])
+    at = run_app()
+    at.text_input(key="f_text").input("aurora").run()
+    at.multiselect(key="f_hosts").set_value(["Canada"]).run()
+    assert "2 scholarships" in texts(at)
+    click(at, "clear_filters")
+    assert "15 scholarships" in texts(at) and "Filtered by" not in texts(at)
+    assert at.text_input(key="f_text").value == "" and at.text_input(key="f_text").proto.set_value
+    assert list(at.multiselect(key="f_hosts").value) == [] and at.multiselect(key="f_hosts").proto.set_value
+
+    at.text_input(key="f_text").input("vega").run()     # the same holds for a dataset switch
+    at.sidebar.radio(key="mode").set_value(config.MODE_REAL).run()
+    assert "1 scholarship" in texts(at) and "Filtered by" not in texts(at)
+    assert at.text_input(key="f_text").value == "" and at.text_input(key="f_text").proto.set_value
+
+
+def test_download_button_covers_all_filtered_results_not_only_the_page(seeded):
+    at = run_app()
+    assert len(card_ids(at)) == 10  # page 1 of 2
+    labels = [b.proto.label for b in at.get("download_button")]
+    assert labels == ["Download 15 results as CSV"]
+    at.multiselect(key="f_hosts").set_value(["United Kingdom"]).run()
+    assert [b.proto.label for b in at.get("download_button")] == ["Download 2 results as CSV"]
+
+
+def test_deadline_states_are_told_apart(seeded, example_records):
+    """Closing soon, open, closed, rolling, 'date not confirmed' and 'nothing published' never share a label."""
+    from scholarpath.ui import common
+
+    labels = {v.record.source_key: common.deadline_state(v)[1] for v in seeded.search()}
+    assert labels["aurora-global-masters-southgate"] == "Closes today"
+    assert labels["cedar-public-health"] == "Closes in 3 days"
+    assert labels["lakeshore-stem-excellence"] == "Open"
+    assert labels["orion-undergraduate-access"] == "Closed"
+    assert labels["harbourview-business-leaders"] == "Rolling"
+
+    real = ScholarPathService(config.MODE_REAL)
+    real.import_records([
+        real_record(source_key="no-year", name="No Year Award", deadline_kind="unknown", deadline_date=None,
+                    deadline_text="The closing date for applications was 16:00 BST on Tuesday 20 October."),
+        real_record(source_key="silent", name="Silent Award", deadline_kind="unknown", deadline_date=None,
+                    deadline_text=""),
+    ])
+    states = {v.record.name: common.deadline_state(v) for v in real.search()}
+    assert states["No Year Award"][1] == "Date not confirmed"      # the provider did publish wording
+    assert states["Silent Award"][1] == "No deadline published"    # nothing was collected at all
+
+    at = run_app()
+    at.sidebar.radio(key="mode").set_value(config.MODE_REAL).run()
+    at = open_review(at, real_record(source_key="no-year")["id"])
+    body = texts(at)
+    assert "Date not confirmed" in body and "No deadline published" not in body
+    assert "Provider's wording: “The closing date for applications was 16" in body
+    assert "never guesses a missing year" in body
+
+
+# --- Review and the Apply flow ------------------------------------------------------------------
+
+def test_review_of_a_record_that_no_longer_exists_explains_and_recovers(seeded):
+    at = open_review(run_app(), "sp-0000000000000000")
+    assert "This scholarship is not in this dataset" in texts(at) and not at.exception
+    click(at, "empty_review_missing_go")
+    assert [t.value for t in at.title] == ["Find scholarships"]
+
+
+def test_review_names_the_outside_website_and_never_claims_to_submit(seeded, example_records):
+    at = open_review(run_app(), example_records[0]["id"])
+    body = texts(at)
+    assert "Opens example\\.org, an outside website, in a new tab" in body
+    assert "ScholarPath never submits anything for you" in body
+    assert "placeholder page, not a real application form" in body  # example data is never passed off as real
+
+
+def test_closed_scholarship_says_so_and_can_still_be_recorded(seeded, example_records):
+    sid = by_key(example_records, "orion-undergraduate-access")["id"]  # closed 10 days before the fixed date
+    at = open_review(run_app(), sid)
+    assert any("The published deadline has passed (2 Nov 2026)" in i.value for i in at.info)
+    assert "Apply on provider site" in link_labels(at) and at.button(key="r_mark") is not None
+
+
+def test_mark_as_applied_alone_creates_nothing_and_is_dropped_when_leaving_review(seeded, example_records):
+    sid = example_records[0]["id"]
+    at = open_review(run_app(), sid)
+    click(at, "r_mark")
+    assert "Confirm your submission" in texts(at) and seeded.applications() == []
+    at = goto(at, "saved")                      # leave through the menu without confirming
+    at = open_review(at, sid)
+    assert "Confirm your submission" not in texts(at) and at.button(key="r_mark") is not None
+    assert seeded.applications() == [] and seeded.saved_ids() == []
+
+
+def test_confirming_adds_exactly_one_application_however_often_it_is_repeated(seeded, example_records):
+    sid = example_records[0]["id"]
+    at = open_review(run_app(), sid)
+    click(at, "r_mark")
+    click(at, "r_confirm")
+    at.run()                                    # a rerun after the confirmation
+    assert "Application added." not in texts(at)  # the one-off message is not repeated
+    # A second confirmation arriving late (double click) has no date field left to read:
+    again = seeded.mark_applied(sid, None)
+    assert again.status == "applied" and again.submitted_date == FIXED_TODAY
+    assert len(seeded.applications()) == 1
+    assert [h["note"] for h in seeded.application_history(sid)] == ["Marked as applied"]
+    assert seeded.saved_ids() == []             # adding an application never saves the scholarship
+
+
+def test_a_future_submission_date_is_refused_next_to_the_field_and_saves_nothing(seeded, example_records, monkeypatch):
+    from scholarpath.services import ServiceError
+
+    sid = example_records[0]["id"]
+    at = open_review(run_app(), sid)
+    click(at, "r_mark")
+    at.date_input(key="c_date").set_value(date(2026, 11, 13)).run()  # the day after the fixed "today"
+    assert [e.value for e in at.error] == ["Choose 12 Nov 2026 or an earlier date. An application cannot have "
+                                           "been submitted in the future."]
+    assert at.button(key="r_confirm").disabled and seeded.get_application(sid) is None
+
+    # If the service refuses for any other reason, that reason also appears inside the card.
+    def refuse(self, scholarship_id, submitted_date):
+        raise ServiceError("Enter the date you submitted the application yourself.")
+
+    at.date_input(key="c_date").set_value(date(2026, 11, 11)).run()
+    assert not at.error and not at.button(key="r_confirm").disabled
+    real_mark_applied = ScholarPathService.mark_applied
+    monkeypatch.setattr(ScholarPathService, "mark_applied", refuse)
+    click(at, "r_confirm")
+    assert [e.value for e in at.error] == ["Not added. Enter the date you submitted the application yourself."]
+    assert "Confirm your submission" in texts(at) and seeded.get_application(sid) is None
+    monkeypatch.setattr(ScholarPathService, "mark_applied", real_mark_applied)  # only this patch is lifted
+    click(at, "r_confirm")
+    assert not at.error and seeded.get_application(sid).submitted_date == date(2026, 11, 11)
+
+
+def test_tracker_refuses_a_future_submission_date_with_the_reason(seeded, example_records):
+    sid = example_records[0]["id"]
+    seeded.mark_applied(sid, date(2026, 11, 10))
+    at = goto(run_app(), "applications")
+    at.date_input(key=f"t_sub_{sid}").set_value(date(2026, 12, 1))
+    click(at, f"t_save_{sid}")
+    assert [e.value for e in at.error] == ["Not saved yet: Submission date cannot be in the future."]
+    assert seeded.get_application(sid).submitted_date == date(2026, 11, 10)
+    assert len(seeded.application_history(sid)) == 1
+
+
+def test_save_and_remove_on_review_show_the_state_and_persist(seeded, example_records):
+    sid = example_records[0]["id"]
+    at = open_review(run_app(), sid)
+    assert ":blue-badge[Saved]" not in texts(at)
+    click(at, "r_save")
+    assert ":blue-badge[Saved]" in texts(at) and seeded.saved_ids() == [sid]
+    at = goto(at, "find")                       # the state is read from SQLite again on every page
+    assert "Saved" in texts(at)
+    at = open_review(at, sid)
+    click(at, "r_unsave")
+    assert ":blue-badge[Saved]" not in texts(at) and seeded.saved_ids() == []
+
+
+# --- Saved, Check my fit, Insights, Data & sources ----------------------------------------------
+
+def test_removing_from_saved_can_be_undone(seeded, example_records):
+    sid = by_key(example_records, "vega-cs-masters")["id"]
+    seeded.save(sid)
+    at = goto(run_app(), "saved")
+    click(at, f"saved_remove_{sid}")
+    assert seeded.saved_ids() == [] and "Nothing saved yet" in texts(at)
+    assert "Removed “Vega Computer Science Master's Award” from Saved" in texts(at).replace("\\", "")
+    click(at, "saved_undo_btn")
+    assert seeded.saved_ids() == [sid] and "Closing in 8 to 30 days (1)" in texts(at)
+    click(at, f"saved_remove_{sid}")
+    at = goto(goto(at, "find"), "saved")        # the offer to undo ends when the page is left
+    assert "saved_undo" not in at.session_state and seeded.saved_ids() == []
+
+
+def test_fit_form_refuses_another_country_without_a_name(seeded):
+    at = goto(run_app(), "fit")
+    at.selectbox(key="m_nat").set_value("__other__")
+    submit_fit(at)
+    assert [e.value for e in at.error] == ["Type your country's name, or choose it from the list."]
+    assert not at.tabs  # no results are shown for an invalid form
+    at.text_input(key="m_nat_other").input("Brazil")
+    submit_fit(at)
+    assert not at.error and len(at.tabs) == 3
+
+
+def test_fit_results_are_never_presented_as_a_guarantee(seeded):
+    at = goto(run_app(), "fit")
+    assert "How the check works, and its limits" in [e.label for e in at.expander]
+    at.selectbox(key="m_nat").set_value("India")
+    at.selectbox(key="m_degree").set_value("master")
+    at.selectbox(key="m_subject").set_value("computer_science")
+    submit_fit(at)
+    assert any("does not guarantee official eligibility" in i.value for i in at.info)
+    assert _tab_counts(at)["Good fits"] >= 1 and "The provider still decides" in texts(at)
+
+
+def test_insight_counts_match_the_stored_data(seeded):
+    import sqlite3
+
+    from scholarpath.ui import insights
+
+    views = seeded.search()
+    with sqlite3.connect(seeded.db_path) as conn:
+        hosts = dict(conn.execute("SELECT country, COUNT(*) FROM scholarship_host_countries GROUP BY country"))
+        funding = [n for (n,) in conn.execute("SELECT COUNT(*) FROM scholarships GROUP BY funding_category")]
+        months = conn.execute("SELECT substr(deadline_date, 1, 7), COUNT(*) FROM scholarships "
+                              "WHERE deadline_kind = 'dated' GROUP BY 1 ORDER BY 1").fetchall()
+    assert dict(insights.count_by_country(views)) == hosts
+    assert sorted(insights.count_by_funding(views).values()) == sorted(funding)
+    assert sum(insights.count_by_funding(views).values()) == len(views) == 15
+    by_month = insights.count_by_month(views)
+    assert [count for _, count in by_month] == [count for _, count in months]  # same order: oldest month first
+    assert [label for label, _ in by_month] == [date.fromisoformat(m + "-01").strftime("%b %Y") for m, _ in months]
+
+
+def test_data_page_switches_dataset_and_keeps_the_two_apart(seeded, example_records):
+    real = ScholarPathService(config.MODE_REAL)
+    real.import_records([real_record()])
+    seeded.save(example_records[0]["id"])
+    at = goto(run_app(), "data")
+    assert "Showing: Example data (fictional)" in texts(at)
+    assert "placeholders on example.org" in texts(at)  # fictional records are never shown as real pages
+    click(at, "data_switch")
+    body = texts(at)
+    assert at.session_state["mode"] == config.MODE_REAL and "Showing: Real sources (collected)" in body
+    assert {m.label: m.value for m in at.metric}["Checked by hand"] == "0 of 1"
+    assert "has not been verified" in body and "should be treated as live" in body
+    assert real.saved_ids() == [] and seeded.saved_ids() == [example_records[0]["id"]]  # nothing crossed over
+    click(at, "data_switch")
+    assert at.session_state["mode"] == config.MODE_EXAMPLE

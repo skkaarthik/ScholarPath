@@ -1,6 +1,54 @@
 # Upgrade status
 
-## Interface redesign (2026-11-14) - done
+## Find → Review → Apply → Track (2026-11-17) - done
+
+### Why
+Too many elements competed for attention: six menu items, a Home page that repeated other
+pages, filters always open, badges on every card, two or three buttons per result, and a
+tracker split across tabs with a table that duplicated the entries below it.
+
+### What was delivered
+1. **One sequence**: Find scholarships → Review → Apply → Track the application.
+2. **Menu**: Find Scholarships (opening page), Saved, Applications, plus a "More" group
+   (Check my fit, Insights, Data & sources) using `st.navigation(position="top")`. Home is removed.
+3. **Find** (`ui/find.py`): search field first; filters and sorting behind one control with a
+   count of filters in use; one Review button per result; table view and CSV behind one control.
+4. **Review** (`ui/review.py`): deadline, who can apply, where and funding at the top; then the
+   Apply section; then eligibility, deadline, funding; wording and source behind controls.
+5. **Apply**: "Apply on provider site" opens the provider's page in a new tab. "Mark as
+   applied" asks for the date and a confirmation. Only "Yes, add to Applications" writes
+   (`services.mark_applied`, one transaction, history note "Marked as applied"). Then
+   "Application added" and "View application", which opens that entry in Applications.
+6. **Saved** (`ui/saved.py`): optional; grouped by deadline; each row reopens Review.
+7. **Applications** (`ui/applications.py`): scholarship, provider and status per entry; "Update
+   status" inside the entry; "Saved. Status: ..." confirmation; empty state leads to Find.
+8. **Data kept**: no schema change. Existing saved items and tracker entries (including
+   Interested/Preparing entries made with the old "Start tracking" button) still appear and can
+   be edited or marked as applied. New entries are created only by confirming a submission.
+
+### Evidence (Linux container, Python 3.13, Streamlit 1.67.0, headless Chrome - not the Mac)
+- `python -m pytest`: **136 passed** (22 Streamlit AppTest UI checks), fixed date 2026-11-12.
+- Fresh databases (`init-examples`, `import-real`), browser walkthrough at **1280 px (real
+  data)** and **390 px (example data)**: search → open filters → Review → Back to results
+  (search text and result count restored) → Review → Apply link checked (provider URL, opens
+  in a new tab) → Mark as applied (SQLite: still no application) → Yes, add to Applications
+  (SQLite: one row, status applied, submitted today; saved list still empty) → "Application
+  added" shown → View application (that entry first, opened) → status changed to Result
+  received / Awarded → saved (SQLite updated, confirmation shown).
+- No horizontal overflow at 390 px on those screens.
+
+### Limits (honest)
+- Not run on the Mac itself. No screen-reader session or axe scan.
+- While a scholarship is open on Review, no menu item is highlighted (Review is not a menu
+  page); the Back button names where the user came from.
+- On phone widths Streamlit folds the menu into the sidebar; the three main links are repeated
+  at the top of the page, and "More" pages are reached through the sidebar arrow.
+- ScholarPath cannot know whether the provider's page was opened or the form submitted; the
+  user's confirmation is the only signal.
+- Earlier limits below still apply (input border contrast, reload after a CLI import, live
+  collection unverified, no record checked by a person).
+
+## Interface redesign (2026-11-14) - done, partly superseded by the section above
 
 ### Assessment before the change (from the code and screenshots of all six pages)
 - Navigation was a sidebar radio restyled into a menu with CSS that depended on Streamlit's

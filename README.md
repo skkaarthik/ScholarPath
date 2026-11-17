@@ -3,7 +3,7 @@
 ScholarPath is a **single-user, local** Streamlit app for discovering international
 scholarships and planning applications:
 
-**Find a scholarship → understand its requirements → save it → track your preparation and deadlines.**
+**Find a scholarship → review it → apply on the provider's site → track the application.**
 
 It is a college semester project. It does not submit applications, predict who wins,
 generate essays, send emails, store documents or convert currencies.
@@ -14,21 +14,25 @@ generate essays, send emails, store documents or convert currencies.
   - *Example data (fictional)* - 15 invented scholarships for offline demos. Always labelled.
   - *Real sources (collected)* - 16 records parsed from official pages of the
     Commonwealth Scholarship Commission in the UK and British Council GREAT Scholarships (India).
-- **Home**: today's date, database-backed counts, your next deadlines and the three steps.
-- **Discover**: search plus country, level, subject, funding and deadline filters that stay
-  visible (OR within a filter, AND across filters), a plain-language summary of active filters,
-  sorting, 10 results per page, and **CSV export of the filtered results** (all pages).
-- **Scholarship details** (opened from any card, with a Back button): dates, funding, recorded
-  requirements, items to confirm on the official page, *original eligibility wording*, and
-  source and freshness (where it came from, when it was read, whether a person checked it).
+- **Find Scholarships** (opening page): search first; country, level, subject, funding,
+  deadline and sorting sit behind *Filters and sorting* (OR within a filter, AND across
+  filters) with a plain-language summary of what is active; 10 results per page; table view and
+  **CSV export of the filtered results** (all pages). Each result has one **Review** button.
+- **Review** (opened from any list, with a Back button that restores the search): deadline,
+  who can apply, where and funding at the top; then **Apply on provider site** (the main
+  action), **Mark as applied** and the optional **Save for later**; then full eligibility,
+  the original wording, deadline, funding, and source and freshness.
+- **Saved**: scholarships kept for later, grouped by how soon they close. Each one reopens Review.
 - **Check my fit**: explainable rule-by-rule results - *satisfied / failed / unknown* - with an
   overall verdict of "Matches recorded requirements", "Needs manual verification" or
   "Does not match recorded requirements". Results are grouped into *Good fits*, *Need more info*
   and *Not a fit*; things only you can confirm become a short checklist. Missing information is
   never treated as a match.
-- **Saved & applications**: deadline board (six non-overlapping groups), saved list, and a
-  tracker (Interested → Preparing → Applied → Result received) with personal target dates,
-  notes, corrections and change history.
+- **Applications**: one entry per application you confirmed, with scholarship, provider and
+  status at a glance. *Update status* (Interested, Preparing, Applied, Result received) with
+  target date, notes and change history. An application is added only after you choose
+  **Mark as applied** and confirm that you submitted it; ScholarPath never submits anything.
+- Under **More** in the menu: Check my fit (above), Insights and Data & sources.
 - **Data & sources**: sources, record counts, read times, verification count and the exact
   refresh commands. Nothing is collected while you browse.
 - **Insights**: counts by host country, funding category and known deadline month.

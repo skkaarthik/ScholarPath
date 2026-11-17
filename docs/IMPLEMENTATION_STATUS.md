@@ -65,6 +65,10 @@ Last updated: 2026-11-12. Branch: `feature/scholarpath-v1`.
 Supersedes the "passport" theme above. Plan, evidence and limits: `docs/UPGRADE_STATUS.md`;
 design rules: `docs/DESIGN_SYSTEM.md`. Requires Streamlit >= 1.67 (the version it was tested on).
 
+## Find → Review → Apply → Track (2026-11-17)
+The pages named above (Home, Discover, Details, Saved & applications) were replaced by Find
+Scholarships, Review, Saved and Applications. See the first section of `docs/UPGRADE_STATUS.md`.
+
 ## Blockers and limitations
 - **Live HTTP collection not verified.** The build environment's network allow-list
   blocked the scholarship sites. Pages were captured with a browser on 2026-11-12,

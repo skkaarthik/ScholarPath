@@ -9,7 +9,6 @@ import streamlit as st
 
 from .. import config
 from . import common
-from .details import FETCH_LABELS
 
 EXPLAIN = {
     config.MODE_EXAMPLE: "Fifteen invented scholarships with deadlines generated around a fixed date, so every "
@@ -50,7 +49,7 @@ def render(svc) -> None:
         "Records": len(records),
         "Oldest read": common.fmt_ts(min(r.source_fetched_at or r.collected_at for r in records)),
         "Newest read": common.fmt_ts(max(r.source_fetched_at or r.collected_at for r in records)),
-        "How it was collected": ", ".join(sorted({FETCH_LABELS.get(r.fetch_method, r.fetch_method)
+        "How it was collected": ", ".join(sorted({common.FETCH_LABELS.get(r.fetch_method, r.fetch_method)
                                                   for r in records})),
     } for name, records in sorted(by_source.items())]), hide_index=True)
 

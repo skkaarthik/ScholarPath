@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from urllib.parse import urlparse
 
 import streamlit as st
 
 from .. import config
 from ..cleaning import is_http_url
-from ..dates import STATUS_LABELS, describe_deadline
-from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, TRACKER_STATUSES, ScholarshipRecord
+from ..dates import STATUS_LABELS
+from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord
 from ..repository import SearchFilters
 from ..services import STORAGE_ERRORS, ScholarPathService, ServiceError
 
@@ -37,7 +38,8 @@ PAGE_INFO = {
     "review": ("Review scholarship", ":material/description:"),
 }
 MAIN_PAGES = ("find", "saved", "applications")   # the three main menu items
-MORE_PAGES = ("fit", "insights", "data")         # quieter "More" group
+MORE_PAGES = ("fit", "insights", "data")         # listed under "More"
+MORE = "more"                                    # menu_item() value for the "More" button
 # Label of the Back button on the Review page, by the page the user came from.
 BACK_LABELS = {"find": "Back to results", "saved": "Back to Saved", "applications": "Back to Applications",
                "fit": "Back to Check my fit"}
@@ -48,25 +50,32 @@ FETCH_LABELS = {
 }
 SUBMITTED_STATUSES = ("applied", "result_received")  # statuses that mean "the user has applied"
 
-# Plain-text labels (tables). Words carry the meaning, never colour alone.
-STATUS_TEXT = {"open": "Open", "expired": "Closed", "rolling": "Rolling", "unknown": "Not published"}
+# Badge colours for the states a student has to tell apart. The words always carry the
+# meaning; colour only supports them. The colours themselves are set in .streamlit/config.toml.
 RULE_TEXT = {"satisfied": "✓ Met", "failed": "✕ Not met", "unknown": "? To confirm"}
-
 OVERALL_STYLE = {
     "Matches recorded requirements": {"badge": "green", "icon": ":material/verified:"},
     "Needs manual verification": {"badge": "blue", "icon": ":material/help:"},
     "Does not match recorded requirements": {"badge": "gray", "icon": ":material/block:"},
 }
+TRACKER_BADGES = {"interested": "gray", "preparing": "gray", "applied": "blue", "result_received": "green"}
+OUTCOME_BADGES = {"awarded": "green", "waitlisted": "orange", "not_selected": "gray", "withdrawn": "gray",
+                  "other": "gray"}
 
-FILTER_KEYS = ("f_text", "f_hosts", "f_degrees", "f_subjects", "f_funding", "f_status")
-FIT_KEYS = ("m_nat", "m_nat_other", "m_dest", "m_degree", "m_subject", "m_score", "m_scale")
+# Empty values of the Find filters and the Check my fit form. To clear a widget its key is
+# set to one of these, never deleted: the browser keeps its own copy of every widget value
+# and would send the old one back on the next click (see reset_widgets).
+FILTER_DEFAULTS = {"f_text": "", "f_hosts": [], "f_degrees": [], "f_subjects": [], "f_funding": [], "f_status": []}
+FIT_DEFAULTS = {"m_nat": "", "m_nat_other": "", "m_dest": "", "m_degree": "", "m_subject": "", "m_score": None,
+                "m_scale": ""}
+FILTER_KEYS = tuple(FILTER_DEFAULTS)
+FIT_KEYS = tuple(FIT_DEFAULTS)
 # Widget values that should survive a visit to another page. Streamlit forgets the
 # value of any widget that is not drawn on the current page unless we keep it alive.
 PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_filters", "mode")
-# Temporary selections that must not survive a dataset switch.
-MODE_SCOPED_KEYS = FILTER_KEYS + FIT_KEYS + ("selected_id", "review_back", "match_results", "match_profile",
-                                             "tracker_pick", "f_sort", "f_page", "confirm_apply", "just_applied",
-                                             "app_saved", "app_error")
+# Temporary selections (not widgets) that must not survive a dataset switch.
+MODE_SCOPED_KEYS = ("selected_id", "review_back", "match_results", "match_profile", "tracker_pick",
+                    "confirm_apply", "confirm_error", "just_applied", "app_message", "saved_undo")
 PAGE_SIZE = 10
 
 
@@ -79,13 +88,52 @@ def keep_state() -> None:
             st.session_state[key] = st.session_state[key]
 
 
+def menu_item(page: str, review_back: str | None = None) -> str:
+    """The menu item to highlight for a page: one of MAIN_PAGES, or MORE.
+
+    Review is not in the menu, so it highlights the page it was opened from
+    (the same page its Back button returns to).
+    """
+    if page == "review":
+        page = review_back if review_back in BACK_LABELS else "find"
+    return page if page in MAIN_PAGES else MORE
+
+
+def enter_page(page: str) -> None:
+    """Called by app.py on every run. When the user has moved to another page, forget
+    steps that were only half done on the page they left."""
+    ss = st.session_state
+    if ss.get("_page") != page:
+        ss.pop("saved_undo", None)                  # the offer to undo a removal from Saved
+        if page != "review":
+            ss.pop("confirm_apply", None)           # "Mark as applied" was opened but not confirmed
+            ss.pop("confirm_error", None)
+        if page != "applications":
+            ss.pop("tracker_pick", None)
+    ss["_page"] = page
+
+
 def current_mode() -> str:
     return st.session_state.setdefault("mode", config.MODE_EXAMPLE)
 
 
+def reset_widgets(defaults: dict) -> None:
+    """Clear widgets by assigning their empty values, so the cleared state also reaches the browser."""
+    for key, value in defaults.items():
+        st.session_state[key] = list(value) if isinstance(value, list) else value
+
+
 def on_mode_change() -> None:
+    """A dataset switch starts clean: no filters, form answers or selections from the other dataset."""
+    reset_widgets({**FILTER_DEFAULTS, **FIT_DEFAULTS, "f_sort": "deadline", "f_page": 1})
     for key in MODE_SCOPED_KEYS:
         st.session_state.pop(key, None)
+
+
+def switch_mode(mode: str) -> None:
+    """Button callback: change the dataset from a page (same effect as the sidebar switch)."""
+    st.session_state["mode"] = mode
+    on_mode_change()
 
 
 def go_to(page: str, scholarship_id: str | None = None, back: str | None = None) -> None:
@@ -106,7 +154,7 @@ def run_page(render) -> None:
     try:
         render(svc)
     except STORAGE_ERRORS as exc:
-        with st.container(border=True, key="page_error"):
+        with st.container(border=True, key="card_page_error"):
             st.error("ScholarPath couldn't read or write its database just now. Nothing was changed.",
                      icon=":material/error:")
             st.markdown("This usually means another ScholarPath window or command is using the database. "
@@ -124,13 +172,13 @@ def page_header(svc: ScholarPathService, title: str, intro: str = "") -> None:
 
 
 def dataset_notice(svc: ScholarPathService) -> None:
-    """One quiet line saying which dataset is showing (the switch is in the sidebar)."""
+    """One line saying which dataset is showing and how far to trust it."""
     if svc.mode == config.MODE_EXAMPLE:
-        st.caption("Example data: invented for practice, so don't apply to these. "
-                   "Switch to Real sources in the sidebar for collected scholarships.")
+        st.caption(":orange-badge[Example data] Invented for practice, so don't apply to these. "
+                   "To see collected scholarships, change the dataset on Data & sources.")
     else:
-        st.caption("Real sources: collected from official pages. Details can change, so confirm on the "
-                   "provider's page before you apply.")
+        st.caption(":blue-badge[Real sources] Collected from official pages. Details can change, so "
+                   "confirm on the provider's page before you apply.")
 
 
 def dataset_ready(svc: ScholarPathService) -> bool:
@@ -142,11 +190,12 @@ def dataset_ready(svc: ScholarPathService) -> bool:
     command = ("python -m scholarpath init-examples" if svc.mode == config.MODE_EXAMPLE
                else "python -m scholarpath import-real")
     with st.container(border=True, key="card_setup_needed"):
-        st.header(f"Set up the {config.MODE_LABELS[svc.mode].lower()}", anchor=False)
+        st.subheader(f"Set up the {config.MODE_LABELS[svc.mode].lower()}", anchor=False)
         st.markdown("This dataset has no scholarships yet. In Terminal, inside the ScholarPath folder, run:")
         st.code(command, language=None)
         st.markdown("Then choose **Check again**. ScholarPath never swaps in the other dataset by itself.")
-        st.button("Check again", key="setup_retry", icon=":material/refresh:", on_click=after_write)
+        st.button("Check again", key="setup_retry", icon=":material/refresh:", on_click=after_write,
+                  type="primary")
         st.caption(f"Database file: {svc.db_path}")
     return False
 
@@ -157,10 +206,9 @@ def after_write() -> None:
 
 
 def flash() -> None:
-    """Show a one-off confirmation set by a callback (after the write committed)."""
-    message = st.session_state.pop("flash", None)
-    if message:
-        st.toast(message, icon=":material/check_circle:")
+    """Show a problem reported by a write callback. Successful writes need no pop-up: every page
+    shows the new state in place (a Saved badge, an updated list, a message inside the entry).
+    Pop-up toasts were dropped because on phones they covered the buttons and the menu bar."""
     problem = st.session_state.pop("flash_error", None)
     if problem:
         st.error(problem, icon=":material/error:")
@@ -168,22 +216,24 @@ def flash() -> None:
 
 # --- write actions shared by several pages (success is reported only after the commit) ----
 
-def _write(action, success: str) -> None:
+def _write(action) -> bool:
+    """Run one service write; on failure leave the reason for flash() and report False."""
     try:
         action()
     except (ServiceError, *STORAGE_ERRORS) as exc:
         st.session_state["flash_error"] = f"Not saved: {exc}"
-    else:
-        after_write()
-        st.session_state["flash"] = success
+        return False
+    after_write()
+    return True
 
 
-def save(svc: ScholarPathService, scholarship_id: str, name: str) -> None:
-    _write(lambda: svc.save(scholarship_id), f"Saved “{name}”. Find it under Saved.")
+def save(svc: ScholarPathService, scholarship_id: str, name: str = "") -> bool:
+    return _write(lambda: svc.save(scholarship_id))
 
 
-def unsave(svc: ScholarPathService, scholarship_id: str) -> None:
-    _write(lambda: svc.unsave(scholarship_id), "Removed from Saved. Any application entry is kept.")
+def unsave(svc: ScholarPathService, scholarship_id: str) -> bool:
+    """Remove from Saved. Any application entry for the scholarship is kept."""
+    return _write(lambda: svc.unsave(scholarship_id))
 
 
 def open_application(scholarship_id: str) -> None:
@@ -251,8 +301,24 @@ def badge_text(text: str) -> str:
     return re.sub(r"[\[\]\\`*_$:<>|]", " ", text or "").strip()
 
 
+def badge(colour: str, text: str) -> str:
+    """Markdown for one badge. Colours: green, orange, yellow, red, blue, gray (see config.toml)."""
+    return f":{colour}-badge[{badge_text(text)}]"
+
+
 def fmt_date(value: date | None) -> str:
+    """One date format for the whole app: 8 Dec 2026."""
     return f"{value.day} {value.strftime('%b %Y')}" if value else "-"
+
+
+def fmt_iso_date(value: str | None) -> str:
+    """Stored ISO date ('2026-12-08') -> '8 Dec 2026'; anything else is shown unchanged."""
+    if not value:
+        return "-"
+    try:
+        return fmt_date(date.fromisoformat(value))
+    except ValueError:
+        return value
 
 
 def fmt_ts(value: str | None) -> str:
@@ -268,6 +334,12 @@ def fmt_ts(value: str | None) -> str:
 
 def plural(count: int, word: str) -> str:
     return f"{count} {word}{'' if count == 1 else 's'}"
+
+
+def site_name(url: str) -> str:
+    """'https://www.example.ac.uk/apply' -> 'example.ac.uk', to name the website a link opens."""
+    host = urlparse(url).netloc if is_http_url(url) else ""
+    return host[4:] if host.startswith("www.") else host
 
 
 def restriction_text(kind: str, values: list[str], labels: dict | None = None) -> str:
@@ -290,10 +362,17 @@ def funding_text(rec: ScholarshipRecord) -> str:
     return FUNDING_CATEGORIES.get(rec.funding_category, rec.funding_category)
 
 
-def deadline_text(view, today) -> str:
-    """Plain words for tables: status plus the date description."""
-    return f"{STATUS_TEXT[view.status]}: " + describe_deadline(
-        view.record.deadline_kind, view.record.deadline_date, today)
+def level_text(rec: ScholarshipRecord) -> str:
+    """Level of study in a few words, or '' when the source does not give one."""
+    if rec.degrees.kind == "list":
+        return degree_text(rec)
+    return "Any level" if rec.degrees.kind == "unrestricted" else ""
+
+
+def where_text(rec: ScholarshipRecord) -> str:
+    """Country, level of study and funding in one plain line (only what the source states)."""
+    funding = "Funding not stated" if rec.funding_category == "unknown" else f"Funding: {funding_text(rec)}"
+    return " · ".join(p for p in (", ".join(rec.host_countries), level_text(rec), funding) if p)
 
 
 def freshness_text(rec: ScholarshipRecord, today: date) -> str:
@@ -314,39 +393,57 @@ def freshness_text(rec: ScholarshipRecord, today: date) -> str:
     return " · ".join(parts)
 
 
-def status_label(status: str) -> str:
-    return STATUS_LABELS.get(status, status)
-
-
 def tracker_status(status: str) -> str:
     """'Applied (recorded by you)' -> 'Applied' for headings and lists."""
     return TRACKER_STATUSES.get(status, status).replace(" (recorded by you)", "")
 
 
-def where_text(rec: ScholarshipRecord) -> str:
-    """Country, level of study and funding in one plain line (only what the source states)."""
-    parts = [", ".join(rec.host_countries)]
-    if rec.degrees.kind == "list":
-        parts.append(degree_text(rec))
-    if rec.funding_category != "unknown":
-        parts.append(f"Funding: {funding_text(rec)}")
-    return " · ".join(p for p in parts if p)
+# --- deadlines: one wording for cards, tables and pages ---------------------------------
+
+def deadline_state(view) -> tuple[str, str, str]:
+    """(badge colour, short label, detail) for a scholarship's deadline.
+
+    Six states are kept apart: closing within 7 days, open, closed, rolling,
+    "date not confirmed" (the provider published wording but no exact date)
+    and "no deadline published" (nothing was collected at all).
+    """
+    rec, status, days = view.record, view.status, view.days_left
+    when = fmt_date(rec.deadline_date)
+    if status == "open" and days == 0:
+        return "orange", "Closes today", when
+    if status == "open" and days <= 7:
+        return "orange", f"Closes in {plural(days, 'day')}", when
+    if status == "open":
+        return "green", STATUS_LABELS["open"], f"closes {when} · {days} days left"
+    if status == "expired":
+        return "gray", STATUS_LABELS["expired"], f"deadline was {when}"
+    if status == "rolling":
+        return "blue", STATUS_LABELS["rolling"], "no fixed closing date"
+    if rec.deadline_text.strip():
+        return "yellow", STATUS_LABELS["unknown"], "see the provider's wording"
+    return "gray", "No deadline published", ""
 
 
 def deadline_line(view) -> str:
-    """The deadline in words. Bold only when it closes within 7 days."""
-    status, days, when = view.status, view.days_left, fmt_date(view.record.deadline_date)
-    if status == "open" and days == 0:
-        return f"**Closes today** · {when}"
-    if status == "open" and days <= 7:
-        return f"**Closes in {plural(days, 'day')}** · {when}"
-    if status == "open":
-        return f"Deadline {when} · {days} days left"
-    if status == "expired":
-        return f"Closed on {when}"
-    if status == "rolling":
-        return "Rolling deadline"
-    return "Deadline not published"
+    """Markdown for cards and page tops: a badge with the state, then the date in words."""
+    colour, label, detail = deadline_state(view)
+    return badge(colour, label) + (f" {detail}" if detail else "")
+
+
+def deadline_plain(view) -> str:
+    """The same wording without a badge, for tables and captions."""
+    _, label, detail = deadline_state(view)
+    return f"{label} · {detail}" if detail else label
+
+
+def application_line(app) -> str:
+    """Markdown for an application's status: badge, outcome and the submission date."""
+    line = badge(TRACKER_BADGES.get(app.status, "gray"), tracker_status(app.status))
+    if app.status == "result_received" and app.outcome:
+        line += " " + badge(OUTCOME_BADGES.get(app.outcome, "gray"), TRACKER_OUTCOMES[app.outcome])
+    if app.submitted_date:
+        line += f" submitted {fmt_date(app.submitted_date)}"
+    return line
 
 
 def results_table(views, today) -> list[dict]:
@@ -354,9 +451,9 @@ def results_table(views, today) -> list[dict]:
         "Scholarship": v.record.name,
         "Provider": v.record.provider,
         "Where": ", ".join(v.record.host_countries),
-        "Level": degree_text(v.record),
+        "Level": level_text(v.record) or "Not recorded",
         "Funding": funding_text(v.record),
-        "Deadline": deadline_text(v, today),
+        "Deadline": deadline_plain(v),
         "Information": freshness_text(v.record, today),
     } for v in views]
 
@@ -368,12 +465,15 @@ def card(prefix: str, view):
     return st.container(border=True, key=f"card_{prefix}_{view.record.id}")
 
 
-def card_summary(view, today=None) -> None:
-    """One list row: scholarship, provider, where/level/funding, deadline (all text escaped)."""
+def card_summary(view, note: str = "") -> None:
+    """One list row: scholarship, provider, where/level/funding, deadline (all text escaped).
+
+    ``note`` is one optional status line, e.g. "Saved" or the application status.
+    """
     rec = view.record
     st.subheader(md_escape(rec.name), anchor=False)
     st.markdown(f"{md_escape(rec.provider)}  \n{md_escape(where_text(rec))}")
-    st.markdown(deadline_line(view))
+    st.markdown(deadline_line(view) + (f"  \n{note}" if note else ""))
 
 
 def review_button(view, prefix: str, back: str, label: str = "Review", **kwargs) -> None:
@@ -393,11 +493,12 @@ def empty_state(key: str, title: str, body: str, action: str | None = None, targ
             st.button(action, key=f"empty_{key}_go", on_click=go_to, args=(target,), type="primary", icon=icon)
 
 
-def safe_link_button(label: str, url: str, key: str, **kwargs) -> None:
-    if is_http_url(url):
-        st.link_button(label, url, key=key, help="Opens the official website in a new tab", **kwargs)
-    else:
-        st.caption(f"{label}: link not shown (not a valid http/https address).")
+def safe_link_button(label: str, url: str, key: str, **kwargs) -> bool:
+    """A button that opens an outside website in a new tab. Returns False if the address is unusable."""
+    if not is_http_url(url):
+        return False
+    st.link_button(label, url, key=key, help=f"Opens {site_name(url)} in a new tab", **kwargs)
+    return True
 
 
 def paginate(items: list, key: str, size: int = PAGE_SIZE) -> tuple[list, int, int]:

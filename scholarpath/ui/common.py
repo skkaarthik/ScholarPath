@@ -20,20 +20,33 @@ import streamlit as st
 from .. import config
 from ..cleaning import is_http_url
 from ..dates import STATUS_LABELS, describe_deadline
-from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, ScholarshipRecord
+from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, TRACKER_STATUSES, ScholarshipRecord
 from ..repository import SearchFilters
 from ..services import STORAGE_ERRORS, ScholarPathService, ServiceError
 
-# slug -> (title in the menu, icon). "details" is reachable only from a card.
+# slug -> (title in the menu, icon). The app follows one sequence:
+# Find a scholarship -> Review it -> Apply on the provider's site -> Track the application.
+# "review" is not in the menu; it opens when a scholarship is chosen from a list.
 PAGE_INFO = {
-    "home": ("Home", ":material/home:"),
-    "discover": ("Discover", ":material/search:"),
+    "find": ("Find Scholarships", ":material/search:"),
+    "saved": ("Saved", ":material/bookmark:"),
+    "applications": ("Applications", ":material/task_alt:"),
     "fit": ("Check my fit", ":material/fact_check:"),
-    "applications": ("Saved & applications", ":material/bookmarks:"),
     "insights": ("Insights", ":material/bar_chart:"),
     "data": ("Data & sources", ":material/database:"),
-    "details": ("Scholarship details", ":material/description:"),
+    "review": ("Review scholarship", ":material/description:"),
 }
+MAIN_PAGES = ("find", "saved", "applications")   # the three main menu items
+MORE_PAGES = ("fit", "insights", "data")         # quieter "More" group
+# Label of the Back button on the Review page, by the page the user came from.
+BACK_LABELS = {"find": "Back to results", "saved": "Back to Saved", "applications": "Back to Applications",
+               "fit": "Back to Check my fit"}
+FETCH_LABELS = {
+    "fictional": "Fictional example (not collected from any source)",
+    "live_http": "Downloaded directly from the official page",
+    "browser_snapshot": "Read from a saved copy of the official page",
+}
+SUBMITTED_STATUSES = ("applied", "result_received")  # statuses that mean "the user has applied"
 
 # Plain-text labels (tables). Words carry the meaning, never colour alone.
 STATUS_TEXT = {"open": "Open", "expired": "Closed", "rolling": "Rolling", "unknown": "Not published"}
@@ -51,8 +64,9 @@ FIT_KEYS = ("m_nat", "m_nat_other", "m_dest", "m_degree", "m_subject", "m_score"
 # value of any widget that is not drawn on the current page unless we keep it alive.
 PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_filters", "mode")
 # Temporary selections that must not survive a dataset switch.
-MODE_SCOPED_KEYS = FILTER_KEYS + FIT_KEYS + ("selected_id", "details_back", "match_results", "match_profile",
-                                             "tracker_pick", "f_sort", "f_page")
+MODE_SCOPED_KEYS = FILTER_KEYS + FIT_KEYS + ("selected_id", "review_back", "match_results", "match_profile",
+                                             "tracker_pick", "f_sort", "f_page", "confirm_apply", "just_applied",
+                                             "app_saved", "app_error")
 PAGE_SIZE = 10
 
 
@@ -79,7 +93,7 @@ def go_to(page: str, scholarship_id: str | None = None, back: str | None = None)
     st.session_state["_goto"] = page
     if scholarship_id:
         st.session_state["selected_id"] = scholarship_id
-        st.session_state["details_back"] = back or "discover"
+        st.session_state["review_back"] = back or "find"
 
 
 def service() -> ScholarPathService:
@@ -110,12 +124,13 @@ def page_header(svc: ScholarPathService, title: str, intro: str = "") -> None:
 
 
 def dataset_notice(svc: ScholarPathService) -> None:
+    """One quiet line saying which dataset is showing (the switch is in the sidebar)."""
     if svc.mode == config.MODE_EXAMPLE:
-        st.markdown(":violet-badge[:material/science: Example data] Invented for practice, so don't apply to "
-                    "these. Switch to *Real sources* in the sidebar for collected scholarships.")
+        st.caption("Example data: invented for practice, so don't apply to these. "
+                   "Switch to Real sources in the sidebar for collected scholarships.")
     else:
-        st.markdown(":blue-badge[:material/public: Real sources] Collected from official pages on the dates "
-                    "shown. Details can change, so confirm on the official page before you apply.")
+        st.caption("Real sources: collected from official pages. Details can change, so confirm on the "
+                   "provider's page before you apply.")
 
 
 def dataset_ready(svc: ScholarPathService) -> bool:
@@ -164,17 +179,17 @@ def _write(action, success: str) -> None:
 
 
 def save(svc: ScholarPathService, scholarship_id: str, name: str) -> None:
-    _write(lambda: svc.save(scholarship_id), f"Saved “{name}”.")
+    _write(lambda: svc.save(scholarship_id), f"Saved “{name}”. Find it under Saved.")
 
 
 def unsave(svc: ScholarPathService, scholarship_id: str) -> None:
-    _write(lambda: svc.unsave(scholarship_id), "Removed from saved. Your tracker notes and history are kept.")
+    _write(lambda: svc.unsave(scholarship_id), "Removed from Saved. Any application entry is kept.")
 
 
-def track(svc: ScholarPathService, scholarship_id: str) -> None:
-    _write(lambda: svc.start_tracking(scholarship_id),
-           "Tracking started. Update your progress under Saved & applications.")
+def open_application(scholarship_id: str) -> None:
+    """Button callback: open Applications with this scholarship's entry first and expanded."""
     st.session_state["tracker_pick"] = scholarship_id
+    go_to("applications")
 
 
 # --- cached reads (keyed by DB path + date, so modes and days never mix) -------------
@@ -211,8 +226,8 @@ def filters_key(f: SearchFilters) -> tuple:
             tuple(f.deadline_statuses))
 
 
-def discover_filters() -> SearchFilters:
-    """Current Discover selections (temporary UI state only)."""
+def find_filters() -> SearchFilters:
+    """Current Find Scholarships selections (temporary UI state only)."""
     ss = st.session_state
     return SearchFilters(
         text=ss.get("f_text") or "", host_countries=list(ss.get("f_hosts") or []),
@@ -303,6 +318,37 @@ def status_label(status: str) -> str:
     return STATUS_LABELS.get(status, status)
 
 
+def tracker_status(status: str) -> str:
+    """'Applied (recorded by you)' -> 'Applied' for headings and lists."""
+    return TRACKER_STATUSES.get(status, status).replace(" (recorded by you)", "")
+
+
+def where_text(rec: ScholarshipRecord) -> str:
+    """Country, level of study and funding in one plain line (only what the source states)."""
+    parts = [", ".join(rec.host_countries)]
+    if rec.degrees.kind == "list":
+        parts.append(degree_text(rec))
+    if rec.funding_category != "unknown":
+        parts.append(f"Funding: {funding_text(rec)}")
+    return " · ".join(p for p in parts if p)
+
+
+def deadline_line(view) -> str:
+    """The deadline in words. Bold only when it closes within 7 days."""
+    status, days, when = view.status, view.days_left, fmt_date(view.record.deadline_date)
+    if status == "open" and days == 0:
+        return f"**Closes today** · {when}"
+    if status == "open" and days <= 7:
+        return f"**Closes in {plural(days, 'day')}** · {when}"
+    if status == "open":
+        return f"Deadline {when} · {days} days left"
+    if status == "expired":
+        return f"Closed on {when}"
+    if status == "rolling":
+        return "Rolling deadline"
+    return "Deadline not published"
+
+
 def results_table(views, today) -> list[dict]:
     return [{
         "Scholarship": v.record.name,
@@ -317,59 +363,24 @@ def results_table(views, today) -> list[dict]:
 
 # --- components --------------------------------------------------------------------------
 
-def deadline_badge(view) -> str:
-    """Badge whose words carry the meaning; colour and icon only reinforce it."""
-    status, days = view.status, view.days_left
-    if status == "open" and days is not None and days <= 7:
-        text = "Closes today" if days == 0 else f"Closes in {plural(days, 'day')}"
-        return f":orange-badge[:material/alarm: {text}]"
-    if status == "open":
-        return f":green-badge[:material/event_available: Open · {days} days left]"
-    if status == "expired":
-        return ":gray-badge[:material/event_busy: Closed]"
-    if status == "rolling":
-        return ":blue-badge[:material/autorenew: Rolling deadline]"
-    return ":gray-badge[:material/event_note: Deadline not published]"
-
-
-def is_urgent(view) -> bool:
-    return view.status == "open" and view.days_left is not None and view.days_left <= 7
-
-
-def meta_badges(rec: ScholarshipRecord) -> str:
-    parts = [f":gray-badge[:material/location_on: {badge_text(', '.join(rec.host_countries))}]"]
-    if rec.degrees.kind == "list":
-        parts.append(f":gray-badge[:material/school: {badge_text(degree_text(rec))}]")
-    if rec.funding_category == "unknown":
-        parts.append(":gray-badge[:material/payments: Funding not stated]")
-    else:
-        parts.append(f":violet-badge[:material/payments: {badge_text(funding_text(rec))}]")
-    return " ".join(parts)
-
-
 def card(prefix: str, view):
     """White bordered container keyed by the stable record ID."""
-    urgent = "urgent_" if is_urgent(view) else ""
-    return st.container(border=True, key=f"card_{urgent}{prefix}_{view.record.id}")
+    return st.container(border=True, key=f"card_{prefix}_{view.record.id}")
 
 
-def card_summary(view, today, compact: bool = False) -> None:
-    """What is it, who offers it, where, what funding, when it closes, how fresh (all text escaped)."""
+def card_summary(view, today=None) -> None:
+    """One list row: scholarship, provider, where/level/funding, deadline (all text escaped)."""
     rec = view.record
     st.subheader(md_escape(rec.name), anchor=False)
-    badges = deadline_badge(view) if compact else f"{deadline_badge(view)} {meta_badges(rec)}"
-    st.markdown(f"{md_escape(rec.provider)}\n\n{badges}")
-    if rec.deadline_date:
-        prefix = "Closed on" if view.status == "expired" else "Deadline"
-        line = f"{prefix} {fmt_date(rec.deadline_date)}"
-    else:
-        line = "No deadline date published"
-    st.caption(line if compact else f"{line} · {freshness_text(rec, today)}")
+    st.markdown(f"{md_escape(rec.provider)}  \n{md_escape(where_text(rec))}")
+    st.markdown(deadline_line(view))
 
 
-def details_button(view, prefix: str, back: str, label: str = "View details", **kwargs) -> None:
-    st.button(label, key=f"{prefix}_det_{view.record.id}", on_click=go_to,
-              args=("details", view.record.id, back), icon=":material/arrow_forward:", **kwargs)
+def review_button(view, prefix: str, back: str, label: str = "Review", **kwargs) -> None:
+    """Open the Review page for this scholarship; ``back`` is the page its Back button returns to."""
+    st.button(label, key=f"{prefix}_rev_{view.record.id}", on_click=go_to,
+              args=("review", view.record.id, back), icon=":material/arrow_forward:", icon_position="right",
+              **kwargs)
 
 
 def empty_state(key: str, title: str, body: str, action: str | None = None, target: str | None = None,

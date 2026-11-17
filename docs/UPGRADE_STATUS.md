@@ -1,5 +1,64 @@
 # Upgrade status
 
+## Polish pass: navigation, design system, repaired interactions (2026-11-17) - done
+
+### What changed and why
+1. **Menu** (`app.py`, `ui/style.py`, `common.menu_item`): one menu drawn from `st.page_link` and
+   `st.popover` inside containers we key, so the highlighted entry is reliable on every page and
+   rerun (before: "Find" never highlighted on phones; nothing highlighted on Review or More pages).
+   Review highlights the page it came from. On phones the four entries form a bottom bar, which
+   replaces the duplicated `mobile_nav` row and the sidebar-arrow route to More pages.
+2. **Design system** (`.streamlit/config.toml`, `style.py`, `common.py`, `docs/DESIGN_SYSTEM.md`):
+   semantic badge/message colours, input borders at 3:1+, white cards on paper with a hairline,
+   one date format, one deadline vocabulary, 44 px touch targets, one focus ring, reduced motion.
+3. **Repaired or clarified interactions**
+   - Deadlines: two Commonwealth records showed "Deadline not published" although the provider
+     published wording without a year; now "Date not confirmed" with the provider's wording.
+     Closed / rolling / no deadline published are told apart everywhere (cards, table, CSV).
+   - Clearing filters and switching datasets now also clear the browser's copy of each widget
+     (before, the old search came back on the next click).
+   - Sorting is visible next to the result count; any search, filter or sort change returns to page 1.
+   - Apply: a repeated "Yes, add to Applications" returns the existing entry instead of an error;
+     a future submission date is refused next to the field and the button is disabled (before, the
+     browser silently kept the previous date). Leaving Review drops a half-finished confirmation.
+   - Missing records explain themselves; closed scholarships say so and can still be recorded.
+   - The More menu is drawn fresh after a choice (before, an open menu swallowed the next click).
+   - Saved: "Remove" with Undo; Applications: next step per status, "Nothing to save" is info,
+     not an error. Toasts removed: on phones they covered buttons and the menu bar.
+   - Check my fit: "Another country" without a name is refused; the limits are explained.
+   - Data & sources: dataset switch on the page (phones), per-source read dates, every record's
+     source link, honest wording on verification and live collection. App icon no longer fetched
+     from the internet.
+
+### Evidence (cloud Linux container, Python 3.12.3, Streamlit 1.67.0, headless Chrome; not the Mac)
+- `python -m pytest`: **158 passed** (was 136; 22 new UI regression tests for the menu highlight,
+  Review context and Back, state kept across Review, page reset, filter clearing, CSV scope,
+  deadline states, mark-as-applied without confirming, duplicate confirmation, future dates,
+  save/unsave persistence, undo, fit validation, Insights counts against SQL, dataset isolation).
+- Browser journeys on disposable databases (`init-examples`, `import-real` into a temp folder),
+  checking SQLite after each write: **57 checks at 1440, 1280, 768, 390 and 360 px, all passing** -
+  search → filter (Open or Rolling) → sort → page 2 → Review → Back (filters, sort, page kept);
+  CSV = every filtered row (not just the page); table view; empty results and reset; save →
+  Saved → reopen → remove → undo; provider link (stored URL, new tab) creates nothing; Mark as
+  applied alone creates nothing; Not yet cancels; future date refused; double click on Yes →
+  exactly one application and one history row, scholarship not saved; reload adds nothing; View
+  application opens that entry; Result received without outcome refused; status saved and history
+  in order after reload; fit validation and results; Insights; Example/Real isolation both ways.
+- Menu checks: **34 at 1440/1280/768 px, 32 at 390/360 px, all passing** (order, 44 px targets,
+  colours, highlight on every page and on Review, More menu inside the screen and closing, Back,
+  Tab order, visible focus ring, Enter and Escape, hover).
+- No page-level horizontal overflow on any page at any of the five widths.
+
+### Limits
+- Not run on the Mac; please run `python -m pytest` and click through once there.
+- No screen-reader session; accessibility was checked with keyboard, contrast arithmetic and
+  DOM inspection only.
+- Streamlit's own small sub-controls (number-input steppers, "?" help icons, chart menus, the
+  clear icon in multiselects) stay below 44 px; each has a larger alternative.
+- A browser reload starts a new Streamlit session, so Review then shows "No scholarship selected"
+  (with a route back); filters also reset on reload.
+- Live HTTP collection is still unverified and no record has been checked by a person.
+
 ## Find → Review → Apply → Track (2026-11-17) - done
 
 ### Why

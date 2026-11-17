@@ -52,16 +52,16 @@ def render(svc) -> None:
     if not common.dataset_ready(svc):
         return
     today = svc.today()
-    use_filters = st.toggle("Only count scholarships that match my Discover filters", key="ins_filters")
-    filters = common.discover_filters() if use_filters else SearchFilters()
+    use_filters = st.toggle("Only count scholarships that match my Find Scholarships filters", key="ins_filters")
+    filters = common.find_filters() if use_filters else SearchFilters()
     views = common.cached_search(str(svc.db_path), today.isoformat(), common.filters_key(filters), "name")
-    scope = "your current Discover filters" if use_filters and not filters.is_empty() else "no filters, so every record"
+    scope = "your current Find Scholarships filters" if use_filters and not filters.is_empty() else "no filters, so every record"
     st.markdown(f"Showing **{len(views)} scholarships** from the *{config.MODE_LABELS[svc.mode]}* dataset, "
                 f"with {scope}.")
     if not views:
-        common.empty_state("insights", "No scholarships match your Discover filters",
+        common.empty_state("insights", "No scholarships match your Find Scholarships filters",
                            "Turn the switch above off to chart the whole dataset, or change the filters.",
-                           "Change filters in Discover", "discover", icon=":material/tune:")
+                           "Change filters", "find", icon=":material/tune:")
         return
 
     hosts = Counter(c for v in views for c in v.record.host_countries)

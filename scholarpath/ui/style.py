@@ -24,8 +24,10 @@ CSS = """
 
 /* Cards: any container whose key starts with "card_" is a white sheet on the paper background. */
 [class*="st-key-card_"] { background: #FFFFFF; }
-/* Deadline within 7 days: a thicker left edge. The badge text says the same thing in words. */
-[class*="st-key-card_urgent_"] { border-left: 0.35rem solid #B45309 !important; }
+
+/* The row of main-section links (key "mobile_nav" in app.py) is only for phone widths. */
+@media (min-width: 768px) { .st-key-mobile_nav { display: none; } }
+@media (max-width: 767.98px) { .stMainBlockContainer { padding-top: 4.25rem; } }
 
 /* One clear keyboard-focus ring everywhere (WCAG 2.4.7 / 2.4.11). */
 :focus-visible { outline: 3px solid #1D4ED8 !important; outline-offset: 2px !important; }

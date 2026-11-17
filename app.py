@@ -59,8 +59,10 @@ with st.sidebar:
 
 # On a phone Streamlit folds the top menu into the sidebar, so the three main sections are
 # repeated as a row of links. style.py hides this row on wider screens, where the top menu shows.
+# Each link sits in a keyed container so style.py can mark the open page (st.page_link has no key of its own).
 with st.container(horizontal=True, key="mobile_nav"):
     for slug in common.MAIN_PAGES:
-        st.page_link(PAGES[slug], label="Find" if slug == "find" else common.PAGE_INFO[slug][0])
+        with st.container(key=f"mobile_nav_{slug}" + ("_current" if current.url_path == slug else ""), width="content"):
+            st.page_link(PAGES[slug], label="Find" if slug == "find" else common.PAGE_INFO[slug][0])
 
 current.run()

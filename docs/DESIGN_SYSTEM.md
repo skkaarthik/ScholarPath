@@ -16,6 +16,8 @@ rules, and `scholarpath/ui/common.py` holds the shared components.
 | Primary | `#343A8C` | Primary buttons, links, selected tab/menu item, chart bars |
 | Border | `#A8A397` | Cards, inputs |
 | Focus ring | `#1D4ED8`, 3 px | Every focusable element |
+| Menu tint | `#E9E8F7` | Open menu item: lavender pill with primary text and icon (about 8:1) |
+| Menu idle text | `#4B4955` | Other menu items; hover adds a primary tint at 8 % |
 
 Deadlines are plain text ("Deadline 8 Dec 2026 · 26 days left"); only a deadline within
 7 days is bold ("**Closes in 3 days**"). Badges are used only for the verdict on Check my fit.
@@ -25,6 +27,10 @@ Deadlines are plain text ("Deadline 8 Dec 2026 · 26 days left"); only a deadlin
   button labels and Back labels name the step ("Back to results", "View application").
 - Menu: Find Scholarships, Saved, Applications, then a "More" group. On phone widths the
   three main links are repeated as a row at the top of the page (`mobile_nav` in `app.py`).
+- Menu look (CSS in `ui/style.py`): every item is a 40 px high pill (44 px on phones and touch
+  screens) with 12 px radius, a 20 px icon, one weight for all labels, and the same keyboard focus
+  ring as everything else. The open page is marked by `aria-current`, so the lavender state follows
+  Streamlit's own page state. Hover and colour changes fade in 0.15 s (off with "reduce motion").
 - One filled (primary) button per screen: Apply on provider site → Yes, add to Applications →
   View application → Save changes. Everything else is outlined or text-only.
 - Secondary material sits behind a labelled control: *Filters and sorting*, *Table view and

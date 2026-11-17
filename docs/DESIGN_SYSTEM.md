@@ -1,7 +1,7 @@
 # ScholarPath design system ("ink on paper")
 
 One calm, readable look for every page. Almost everything is set in
-`.streamlit/config.toml` (Streamlit's own theme); `scholarpath/ui/style.py` adds four CSS
+`.streamlit/config.toml` (Streamlit's own theme); `scholarpath/ui/style.py` adds a few CSS
 rules, and `scholarpath/ui/common.py` holds the shared components.
 
 ## Tokens
@@ -15,12 +15,21 @@ rules, and `scholarpath/ui/common.py` holds the shared components.
 | Ink (text) | `#121118` | All text; captions are the same ink at 60 % |
 | Primary | `#343A8C` | Primary buttons, links, selected tab/menu item, chart bars |
 | Border | `#A8A397` | Cards, inputs |
-| Urgent edge | `#B45309` | Left edge of a card whose deadline is within 7 days |
 | Focus ring | `#1D4ED8`, 3 px | Every focusable element |
 
-Status colours come from Streamlit's badge palette and always carry words and an icon:
-orange "Closes in N days", green "Open · N days left", blue "Rolling deadline",
-gray "Closed" / "Deadline not published", violet funding and "Example data".
+Deadlines are plain text ("Deadline 8 Dec 2026 · 26 days left"); only a deadline within
+7 days is bold ("**Closes in 3 days**"). Badges are used only for the verdict on Check my fit.
+
+## Sequence and hierarchy
+- One sequence: **Find scholarships → Review → Apply → Track the application**. Page titles,
+  button labels and Back labels name the step ("Back to results", "View application").
+- Menu: Find Scholarships, Saved, Applications, then a "More" group. On phone widths the
+  three main links are repeated as a row at the top of the page (`mobile_nav` in `app.py`).
+- One filled (primary) button per screen: Apply on provider site → Yes, add to Applications →
+  View application → Save changes. Everything else is outlined or text-only.
+- Secondary material sits behind a labelled control: *Filters and sorting*, *Table view and
+  download*, *Original eligibility wording*, *Source and freshness*, *Update status*.
+- No duplicate panels, metric rows or repeated instructions on the main pages.
 
 ## Type and spacing
 - Headings: serif system stack (Iowan Old Style → Palatino → Georgia). Body: system sans.
@@ -31,10 +40,9 @@ gray "Closed" / "Deadline not published", violet funding and "Example data".
 
 ## Components (all in `ui/common.py`)
 - `page_header` - title, one-sentence purpose, dataset label. Same on every page.
-- `card` + `card_summary` - what it is, who offers it, deadline badge, where/level/funding
-  badges, deadline date and freshness line.
-- `details_button`, `save` / `unsave` / `track` - the same actions with the same labels everywhere.
-  Primary (filled) is used for the one main action in a card or form.
+- `card` + `card_summary` - scholarship, provider, where/level/funding, deadline line.
+- `review_button` - opens Review and remembers which page Back returns to.
+- `save` / `unsave` / `open_application` - the same actions with the same labels everywhere.
 - `empty_state` - why a list is empty plus the next step.
 - `flash` - toast after a committed write; errors stay on the page as `st.error`.
 - `paginate` / `pager` - 10 results per page with Previous / Next.

@@ -98,7 +98,7 @@ from mixing (`config.db_path`, `services.ensure_schema` mode guard, `dataset_ori
 
 ## Testing
 
-- `pytest` (136 tests, ~5 s): validation, parsers on fixtures and snapshots, safe writes, polite
+- `pytest` (158 tests, ~12 s): validation, parsers on fixtures and snapshots, safe writes, polite
   fetcher with fake HTTP, persistence across reopen, idempotency, rollback, migration, isolation,
   filters, sorting, boundaries, matching, CSV content and escaping, tracker rules, and Streamlit
   `AppTest` UI flows that check the database afterwards.

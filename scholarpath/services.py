@@ -305,6 +305,36 @@ class ScholarPathService:
             row = repo.application_for(conn, scholarship_id)
         return _to_application(row)
 
+    def mark_applied(self, scholarship_id: str, submitted_date: date | None) -> Application:
+        """Record that the user confirmed they submitted on the provider's site.
+
+        This is how an application enters the tracker from the Review page: the
+        entry is created (or an earlier Interested/Preparing entry is moved on)
+        in one transaction. An entry that is already Applied or further is left
+        untouched, so confirming twice never rewrites anything.
+        """
+        errors = self.validate_application("applied", None, submitted_date, None, self.today())
+        if errors:
+            raise ServiceError(" ".join(errors))
+        now = config.utc_now_iso()
+        with connect(self.db_path) as conn, transaction(conn):
+            self._require_scholarship(conn, scholarship_id)
+            row = repo.application_for(conn, scholarship_id)
+            if row is not None and row["status"] in ("applied", "result_received"):
+                return _to_application(row)
+            app_id = row["id"] if row is not None else repo.application_insert(conn, scholarship_id, "applied", now)
+            values = {
+                "status": "applied",
+                "target_date": row["target_date"] if row is not None else None,
+                "submitted_date": submitted_date.isoformat(),
+                "outcome": None,
+                "notes": row["notes"] if row is not None else "",
+            }
+            repo.application_update(conn, app_id, values, now)
+            repo.history_insert(conn, app_id, values, "Marked as applied", now)
+            row = repo.application_for(conn, scholarship_id)
+        return _to_application(row)
+
     def update_application(self, scholarship_id: str, status: str, target_date: date | None = None,
                            submitted_date: date | None = None, outcome: str | None = None,
                            notes: str = "", history_note: str = "") -> Application:

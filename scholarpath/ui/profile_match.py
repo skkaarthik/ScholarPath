@@ -85,7 +85,7 @@ def _result_card(view, match, today) -> None:
             if lines:
                 st.markdown("\n".join(lines))
         with actions:
-            common.details_button(view, "m", back="fit", width="stretch")
+            common.review_button(view, "m", back="fit", width="stretch")
         if match.manual:
             with st.expander(f"Confirm on the official page ({len(match.manual)})", icon=":material/checklist:"):
                 st.caption("Part of the eligibility rules, but written in a way only you can check.")

@@ -234,6 +234,7 @@ class ScholarPathService:
                 "tracked": len(repo.application_list(conn)),
                 "oldest_collected": fresh["oldest_collected"],
                 "newest_collected": fresh["newest_collected"],
+                "oldest_fetched": fresh["oldest_fetched"],
                 "newest_fetched": fresh["newest_fetched"],
                 "verified_count": fresh["verified_count"] or 0,
                 "unavailable_count": fresh["unavailable_count"] or 0,
@@ -311,17 +312,18 @@ class ScholarPathService:
         This is how an application enters the tracker from the Review page: the
         entry is created (or an earlier Interested/Preparing entry is moved on)
         in one transaction. An entry that is already Applied or further is left
-        untouched, so confirming twice never rewrites anything.
+        untouched and returned as it is, so a repeated click or a rerun can
+        never create a second entry, rewrite the first one or raise an error.
         """
-        errors = self.validate_application("applied", None, submitted_date, None, self.today())
-        if errors:
-            raise ServiceError(" ".join(errors))
         now = config.utc_now_iso()
         with connect(self.db_path) as conn, transaction(conn):
             self._require_scholarship(conn, scholarship_id)
             row = repo.application_for(conn, scholarship_id)
             if row is not None and row["status"] in ("applied", "result_received"):
                 return _to_application(row)
+            errors = self.validate_application("applied", None, submitted_date, None, self.today())
+            if errors:
+                raise ServiceError(" ".join(errors))  # leaves the transaction: nothing is written
             app_id = row["id"] if row is not None else repo.application_insert(conn, scholarship_id, "applied", now)
             values = {
                 "status": "applied",

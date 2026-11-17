@@ -10,20 +10,21 @@ from __future__ import annotations
 
 from datetime import date
 
+# One vocabulary for the whole app (pages, filters and the CSV export).
 STATUS_LABELS = {
     "open": "Open",
-    "expired": "Expired",
+    "expired": "Closed",
     "rolling": "Rolling",
-    "unknown": "Unknown",
+    "unknown": "Date not confirmed",
 }
 
 GROUPS = {
-    "due_7": "Due today to 7 days",
-    "due_30": "Due in 8-30 days",
+    "due_7": "Closing within 7 days",
+    "due_30": "Closing in 8 to 30 days",
     "later": "More than 30 days away",
-    "expired": "Expired",
+    "expired": "Closed",
     "rolling": "Rolling deadline",
-    "unknown": "Deadline unknown",
+    "unknown": "Closing date not confirmed",
 }
 GROUP_ORDER = list(GROUPS)
 
@@ -54,13 +55,13 @@ def dashboard_group(kind: str, deadline: date | None, today: date) -> str:
 def describe_deadline(kind: str, deadline: date | None, today: date) -> str:
     status, days_left = deadline_status(kind, deadline, today)
     if status == "rolling":
-        return "Rolling - applications reviewed as received (check source)"
+        return "Rolling: no fixed closing date, applications are reviewed as they arrive"
     if status == "unknown":
-        return "Unknown - not published in a structured form"
+        return "No exact closing date is recorded"
     assert deadline is not None and days_left is not None
-    stamp = deadline.strftime("%d %b %Y")
+    stamp = f"{deadline.day} {deadline.strftime('%b %Y')}"
     if days_left == 0:
         return f"{stamp} - closes today"
     if days_left > 0:
         return f"{stamp} - {days_left} day{'s' if days_left != 1 else ''} left"
-    return f"{stamp} - expired {-days_left} day{'s' if days_left != -1 else ''} ago"
+    return f"{stamp} - closed {-days_left} day{'s' if days_left != -1 else ''} ago"

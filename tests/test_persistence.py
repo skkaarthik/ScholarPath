@@ -85,6 +85,26 @@ def test_removing_from_shortlist_keeps_application_history(example_service, exam
     assert sid in {v.record.id for group in service.dashboard().values() for v in group}
 
 
+def test_removing_an_application_deletes_only_the_entry_and_its_history(example_service, example_records):
+    sid = by_key(example_records, "vega-cs-masters")["id"]
+    other = by_key(example_records, "lakeshore-stem-excellence")["id"]
+    example_service.save(sid)
+    example_service.mark_applied(sid, FIXED_TODAY)
+    example_service.mark_applied(other, FIXED_TODAY)
+    example_service.update_application(sid, "result_received", submitted_date=FIXED_TODAY, outcome="not_selected")
+    assert example_service.remove_application(sid) is True
+    service = reopen(example_service)
+    assert service.get_application(sid) is None and service.application_history(sid) == []
+    assert [a.scholarship_id for a in service.applications()] == [other]   # other entries untouched
+    assert service.saved_ids() == [sid] and service.get(sid) is not None   # Saved and the record stay
+    with connect(service.db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM application_history ah LEFT JOIN applications a "
+                            "ON a.id = ah.application_id WHERE a.id IS NULL").fetchone()[0] == 0
+    assert service.remove_application(sid) is False                        # a repeated click is harmless
+    service.mark_applied(sid, FIXED_TODAY)                                 # and it can be added again
+    assert len(service.application_history(sid)) == 1
+
+
 def test_scholarships_referenced_by_user_data_cannot_be_deleted(example_service, example_records):
     sid = by_key(example_records, "vega-cs-masters")["id"]
     example_service.save(sid)

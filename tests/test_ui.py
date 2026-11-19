@@ -680,6 +680,32 @@ def test_removing_from_saved_can_be_undone(seeded, example_records):
     assert "saved_undo" not in at.session_state and seeded.saved_ids() == []
 
 
+def test_removing_an_application_asks_first_and_can_be_cancelled(seeded, example_records):
+    sid = by_key(example_records, "vega-cs-masters")["id"]
+    seeded.mark_applied(sid, FIXED_TODAY)
+    at = goto(run_app(), "applications")
+    click(at, f"app_remove_{sid}")
+    assert "Remove this application?" in texts(at) and seeded.get_application(sid) is not None
+    click(at, f"app_remove_no_{sid}")
+    assert "Remove this application?" not in texts(at) and seeded.get_application(sid) is not None
+    click(at, f"app_remove_{sid}")
+    at = goto(goto(at, "find"), "applications")  # leaving the page drops an unconfirmed removal
+    assert "app_remove" not in at.session_state and seeded.get_application(sid) is not None
+
+
+def test_confirmed_removal_deletes_the_entry_and_shows_the_empty_state(seeded, example_records):
+    sid = by_key(example_records, "vega-cs-masters")["id"]
+    seeded.save(sid)
+    seeded.mark_applied(sid, FIXED_TODAY)
+    at = goto(run_app(), "applications")
+    click(at, f"app_remove_{sid}")
+    click(at, f"app_remove_yes_{sid}")
+    assert seeded.get_application(sid) is None and seeded.application_history(sid) == []
+    assert "Removed “Vega Computer Science Master's Award” from Applications." in texts(at).replace("\\", "")
+    assert "No applications yet" in texts(at)
+    assert seeded.saved_ids() == [sid]              # Saved is not touched
+
+
 def test_fit_form_refuses_another_country_without_a_name(seeded):
     at = goto(run_app(), "fit")
     at.selectbox(key="m_nat").set_value("__other__")

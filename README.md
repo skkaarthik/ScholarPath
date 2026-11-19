@@ -106,6 +106,30 @@ a run with failed pages writes a separate `*.partial-*.json` file unless you pas
 missing from one run. **Live collection has not been verified from the development
 environment** (see [docs/SOURCES.md](docs/SOURCES.md)).
 
+## AI advisor (optional)
+
+The Review page can show an **Ask the AI advisor** section that answers questions about the
+scholarship on screen. It is off until an API key is set. Facts are taken only from the stored
+record; anything the record does not say is sent back to the official page.
+
+1. Create a free key at https://console.groq.com (default provider), or at
+   https://aistudio.google.com/apikey for Gemini.
+2. Set it, either as environment variables or in `.streamlit/secrets.toml` (git-ignored; on
+   Streamlit Community Cloud, paste the same lines into the app's *Secrets* setting):
+
+```toml
+SCHOLARPATH_AI_API_KEY = "your-key"
+# Optional - defaults shown. For Gemini use
+# https://generativelanguage.googleapis.com/v1beta/openai and a Gemini model name.
+SCHOLARPATH_AI_BASE_URL = "https://api.groq.com/openai/v1"
+SCHOLARPATH_AI_MODEL = "llama-3.3-70b-versatile"
+```
+
+Free tiers are rate-limited and shared by everyone using the same key, so each visitor can ask
+15 questions per visit. Free models are renamed from time to time: if answers stop, set
+`SCHOLARPATH_AI_MODEL` to a model listed in the provider's console. Questions are sent to the
+provider, so do not type personal details.
+
 ## Tests
 
 ```bash

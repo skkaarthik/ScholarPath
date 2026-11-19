@@ -6,6 +6,7 @@ tests and demonstrations:
 
 * ``SCHOLARPATH_DATA_DIR`` - put the SQLite databases somewhere else (tests use a temp dir).
 * ``SCHOLARPATH_TODAY``    - pin "today" (ISO date) so date logic is reproducible.
+* ``SCHOLARPATH_NOW``      - pin the exact instant (ISO timestamp with zone), for deadline-time tests.
 """
 
 from __future__ import annotations
@@ -69,10 +70,24 @@ class Clock:
     def today(self) -> date:
         if self.fixed_today is not None:
             return self.fixed_today
+        instant = os.environ.get("SCHOLARPATH_NOW")
+        if instant:   # a pinned instant decides the date too, so the two never disagree
+            return datetime.fromisoformat(instant.replace("Z", "+00:00")).astimezone(APP_TIMEZONE).date()
         override = os.environ.get("SCHOLARPATH_TODAY")
         if override:
             return date.fromisoformat(override)
         return datetime.now(APP_TIMEZONE).date()
+
+    def now(self) -> datetime:
+        """The current instant (UTC). When 'today' is pinned (tests, demonstrations), "now" is
+        noon of that day in the app timezone, so the date and the instant always agree."""
+        override = os.environ.get("SCHOLARPATH_NOW")
+        if override and self.fixed_today is None:
+            return datetime.fromisoformat(override.replace("Z", "+00:00")).astimezone(timezone.utc)
+        if self.fixed_today is not None or os.environ.get("SCHOLARPATH_TODAY"):
+            day = self.today()
+            return datetime(day.year, day.month, day.day, 12, tzinfo=APP_TIMEZONE).astimezone(timezone.utc)
+        return datetime.now(timezone.utc).replace(microsecond=0)
 
     @staticmethod
     def now_utc() -> datetime:

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from . import advisor, config, repository as repo
+from . import advisor, chat_context, config, repository as repo
 from .cleaning import content_hash, validate_many
 from .config import Clock
 from .database import DatabaseBusyError, connect, migrate, schema_version, transaction
@@ -220,24 +220,38 @@ class ScholarPathService:
             records = repo.load_records(conn, [scholarship_id])
         return self._view(records[0], self.today()) if records else None
 
-    # --- AI advisor (optional: hidden unless an API key is configured) -------------------
+    # --- ScholarPath assistant (read-only: it never changes a record) -------------------------
 
     @staticmethod
-    def advisor_available() -> bool:
-        return advisor.settings_from_env() is not None
+    def assistant_mode() -> str:
+        """"live" when an AI provider is configured, otherwise "demo" (labelled record-only answers)."""
+        return "live" if advisor.settings_from_env() is not None else "demo"
 
-    def ask_advisor(self, scholarship_id: str, question: str, history: list[tuple[str, str]]) -> str:
-        """Answer a question about one scholarship, grounded in its stored record."""
+    def chat(self, question: str, history: list[tuple[str, str]], current_id: str | None = None,
+             profile=None) -> advisor.ChatReply:
+        """Answer one question using only the records the server selects for it.
+
+        ``history`` is [(question, answer), ...] from this browser session; ``profile`` is the
+        Check my fit profile, if the student filled it in. Raises advisor.AdvisorError with a
+        plain message (kind "input", "quota", "config" or "unavailable") when no answer is possible.
+        Application entries are read through the same service as the Applications page: the
+        assistant can see nothing that page does not show.
+        """
+        question = advisor.check_question(question)
+        today = self.today()
+        views = self.search(sort="deadline")
+        chat = chat_context.select(views, question, history, current_id, profile, self.applications())
+        names = [c.view.record.name for c in chat.records]
         settings = advisor.settings_from_env()
         if settings is None:
-            raise ServiceError("The AI advisor is not set up on this installation.")
-        view = self.get(scholarship_id)
-        if view is None:
-            raise ServiceError("This scholarship is no longer in the current dataset.")
-        try:
-            return advisor.ask(settings, view.record, question, history)
-        except advisor.AdvisorError as exc:
-            raise ServiceError(str(exc)) from None
+            shown = chat.records[:1] if chat.current_tag else chat.records[:3]
+            if chat.intent == "progress":
+                shown = [c for c in chat.records if any(a["tag"] == c.tag for a in chat.applications or [])]
+            return advisor.ChatReply(advisor.demo_answer(chat, today), shown, demo=True, context_names=names)
+        context = chat_context.context_block(chat, today, profile, config.MODE_LABELS.get(self.mode, self.mode))
+        raw = advisor.call_provider(settings, advisor.build_messages(context, question, history))
+        text, references, invented = chat_context.clean_answer(raw, chat)
+        return advisor.ChatReply(text, references, demo=False, context_names=names, invented=invented)
 
     def filter_options(self) -> dict[str, list[str]]:
         with connect(self.db_path) as conn:

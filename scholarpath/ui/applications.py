@@ -3,6 +3,8 @@
 Each entry shows scholarship, provider, status and the next step. "Update
 status" opens the edit fields for that entry; saving writes to SQLite and the
 confirmation appears in the entry only after the write succeeded.
+"Remove" asks for confirmation inside the entry, then deletes the entry and its
+history; the scholarship itself and the Saved list are not changed.
 Rules (checked in services.validate_application): Applied needs a submission
 date, Result received needs an outcome.
 """
@@ -57,6 +59,41 @@ def _save(svc, app, name: str) -> None:
     ss["app_message"] = (sid, "success", f"Saved. Status: {common.tracker_status(status)}.")
 
 
+def _ask_remove(scholarship_id: str) -> None:
+    st.session_state["app_remove"] = scholarship_id
+
+
+def _cancel_remove() -> None:
+    st.session_state.pop("app_remove", None)
+
+
+def _remove(svc, scholarship_id: str, name: str) -> None:
+    """Button callback for "Yes, remove": the note is shown only after the delete committed."""
+    ss = st.session_state
+    ss.pop("app_remove", None)
+    try:
+        removed = svc.remove_application(scholarship_id)
+    except STORAGE_ERRORS as exc:
+        ss["app_message"] = (scholarship_id, "error", f"Not removed: {exc}")
+        return
+    common.after_write()
+    if ss.get("tracker_pick") == scholarship_id:
+        ss.pop("tracker_pick")
+    if removed:
+        ss["app_removed"] = name
+
+
+def _confirm_remove(svc, app, name: str) -> None:
+    sid = app.scholarship_id
+    with st.container(border=True, key=f"app_confirm_remove_{sid}"):
+        st.markdown("**Remove this application?** Its status, notes and history are deleted and can't be "
+                    "restored. The scholarship itself stays in Find (and in Saved, if you saved it).")
+        with st.container(horizontal=True):
+            st.button("Yes, remove", key=f"app_remove_yes_{sid}", on_click=_remove, args=(svc, sid, name),
+                      icon=":material/delete:")
+            st.button("Cancel", key=f"app_remove_no_{sid}", on_click=_cancel_remove, type="tertiary")
+
+
 def _edit_fields(svc, app, view, today) -> None:
     sid = app.scholarship_id
     statuses = list(TRACKER_STATUSES)
@@ -104,6 +141,10 @@ def _entry(svc, app, view, today, opened: bool) -> None:
         with action:
             common.review_button(view, "app", back="applications", label="View scholarship", type="tertiary",
                                  width="stretch")
+            st.button("Remove", key=f"app_remove_{sid}", on_click=_ask_remove, args=(sid,), type="tertiary",
+                      icon=":material/delete:", width="stretch")
+        if st.session_state.get("app_remove") == sid:
+            _confirm_remove(svc, app, rec.name)
         message = st.session_state.get("app_message")
         if message and message[0] == sid:
             st.session_state.pop("app_message")
@@ -117,6 +158,9 @@ def render(svc) -> None:
     if not common.dataset_ready(svc):
         return
     common.flash()
+    removed = st.session_state.get("app_removed")
+    if removed:
+        st.success(f"Removed “{common.md_escape(removed)}” from Applications.", icon=":material/check_circle:")
     apps = svc.applications()
     if not apps:
         common.empty_state("applications", "No applications yet",

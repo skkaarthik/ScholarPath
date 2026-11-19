@@ -188,7 +188,7 @@ def dataset_ready(svc: ScholarPathService) -> bool:
     """Explain how to set up an empty dataset (never a silent fallback to the other one)."""
     if svc.database_exists():
         svc.ensure_schema()
-        if cached_overview(str(svc.db_path), svc.today().isoformat())["scholarships"] > 0:
+        if cached_overview(str(svc.db_path), time_key(svc))["scholarships"] > 0:
             return True
     command = ("python -m scholarpath init-examples" if svc.mode == config.MODE_EXAMPLE
                else "python -m scholarpath import-real")
@@ -245,7 +245,16 @@ def open_application(scholarship_id: str) -> None:
     go_to("applications")
 
 
-# --- cached reads (keyed by DB path + date, so modes and days never mix) -------------
+# --- cached reads (keyed by DB path + a 5-minute time window, so modes never mix and a
+# deadline that passes mid-day leaves discovery within minutes) -------------------------
+
+CACHE_WINDOW_MINUTES = 5
+
+
+def time_key(svc: ScholarPathService) -> str:
+    """'Now', rounded down to the cache window. Part of every cached read's key."""
+    now = svc.now()
+    return now.replace(minute=now.minute - now.minute % CACHE_WINDOW_MINUTES, second=0).isoformat()
 
 def _svc_for(db_path: str) -> ScholarPathService:
     mode = config.MODE_EXAMPLE if db_path == str(config.db_path(config.MODE_EXAMPLE)) else config.MODE_REAL
@@ -253,15 +262,15 @@ def _svc_for(db_path: str) -> ScholarPathService:
 
 
 @st.cache_data(show_spinner=False)
-def cached_search(db_path: str, today: str, filters: tuple, sort: str):
-    keys = ("text", "host_countries", "degrees", "subjects", "funding", "deadline_statuses")
+def cached_search(db_path: str, when: str, filters: tuple, sort: str):
+    keys = ("text", "host_countries", "degrees", "subjects", "funding", "deadline_statuses", "include_closed")
     values = dict(zip(keys, filters))
     values = {k: (list(v) if isinstance(v, tuple) else v) for k, v in values.items()}
     return _svc_for(db_path).search(SearchFilters(**values), sort)
 
 
 @st.cache_data(show_spinner=False)
-def cached_overview(db_path: str, today: str) -> dict:
+def cached_overview(db_path: str, when: str) -> dict:
     return _svc_for(db_path).overview()
 
 
@@ -270,13 +279,16 @@ def cached_options(db_path: str) -> dict:
     return _svc_for(db_path).filter_options()
 
 
-def all_views(svc: ScholarPathService, sort: str = "deadline"):
-    return cached_search(str(svc.db_path), svc.today().isoformat(), filters_key(SearchFilters()), sort)
+def all_views(svc: ScholarPathService, sort: str = "deadline", include_closed: bool = False):
+    """Every open opportunity; with include_closed, also closed ones (for pages that must reach
+    a saved or tracked record whatever its state, and for Data & sources)."""
+    return cached_search(str(svc.db_path), time_key(svc), filters_key(SearchFilters(include_closed=include_closed)),
+                         sort)
 
 
 def filters_key(f: SearchFilters) -> tuple:
     return (f.text, tuple(f.host_countries), tuple(f.degrees), tuple(f.subjects), tuple(f.funding),
-            tuple(f.deadline_statuses))
+            tuple(f.deadline_statuses), f.include_closed)
 
 
 def find_filters() -> SearchFilters:
@@ -419,6 +431,8 @@ def deadline_state(view) -> tuple[str, str, str]:
     if status == "open":
         return "green", STATUS_LABELS["open"], f"closes {when} · {days} days left"
     if status == "expired":
+        if rec.deadline_date is None:
+            return "gray", STATUS_LABELS["expired"], "the official page says applications are closed"
         return "gray", STATUS_LABELS["expired"], f"deadline was {when}"
     if status == "rolling":
         return "blue", STATUS_LABELS["rolling"], "no fixed closing date"

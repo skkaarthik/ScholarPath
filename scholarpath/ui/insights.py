@@ -74,7 +74,7 @@ def render(svc) -> None:
     today = svc.today()
     use_filters = st.toggle("Only count scholarships that match my Find Scholarships filters", key="ins_filters")
     filters = common.find_filters() if use_filters else SearchFilters()
-    views = common.cached_search(str(svc.db_path), today.isoformat(), common.filters_key(filters), "name")
+    views = common.cached_search(str(svc.db_path), common.time_key(svc), common.filters_key(filters), "name")
     if use_filters and filters.is_empty():
         scope = "no filters set on Find Scholarships, so every record"
     elif use_filters:

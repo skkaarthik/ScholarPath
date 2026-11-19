@@ -17,7 +17,8 @@ from . import common
 
 SORT_LABELS = {"deadline": "Deadline (soonest first)", "name": "Scholarship name (A to Z)",
                "provider": "Provider (A to Z)"}
-STATUS_OPTIONS = {key: STATUS_LABELS[key] for key in ("open", "rolling", "unknown", "expired")}
+# Closed opportunities never appear in Find (they stay reachable from Saved and Applications).
+STATUS_OPTIONS = {key: STATUS_LABELS[key] for key in ("open", "rolling", "unknown")}
 # Filters: session key -> (label in the summary line, value -> readable name).
 ADVANCED = {
     "f_hosts": ("Country", {}), "f_degrees": ("Level", DEGREES), "f_subjects": ("Subject", SUBJECTS),
@@ -48,6 +49,9 @@ def _active_filters() -> list[str]:
 
 
 def _search_and_filters(options: dict) -> None:
+    # A "Closed" filter kept from an earlier version or visit is dropped: Find shows only open ones.
+    if any(v not in STATUS_OPTIONS for v in st.session_state.get("f_status") or []):
+        st.session_state["f_status"] = [v for v in st.session_state["f_status"] if v in STATUS_OPTIONS]
     st.text_input("Search by scholarship or provider", key="f_text", on_change=_first_page,
                   placeholder="e.g. Commonwealth", icon=":material/search:")
     in_use = sum(1 for key in ADVANCED if st.session_state.get(key))
@@ -81,7 +85,7 @@ def _table_and_download(svc, views, today) -> None:
         st.toggle("Show results as a table", key="f_table")
         st.download_button(
             f"Download {common.plural(len(views), 'result')} as CSV",
-            data=to_csv([v.record for v in views], today),
+            data=to_csv([v.record for v in views], today, svc.now()),
             file_name=f"scholarpath_{svc.mode}_{today.isoformat()}.csv", mime="text/csv", key="find_csv",
             icon=":material/download:", on_click="ignore")
         st.caption("The file holds every result that matches the search and filters above (all pages), "
@@ -89,10 +93,10 @@ def _table_and_download(svc, views, today) -> None:
 
 
 def _no_results(svc, today) -> None:
-    total = common.cached_overview(str(svc.db_path), today.isoformat())["scholarships"]
+    total = common.cached_overview(str(svc.db_path), common.time_key(svc))["active"]
     with st.container(border=True, key="card_empty_find"):
         st.subheader("No scholarships match", anchor=False)
-        st.markdown(f"This dataset has {common.plural(total, 'scholarship')}, but none meet your search and "
+        st.markdown(f"This dataset has {common.plural(total, 'open scholarship')}, but none meet your search and "
                     "every filter at once. Remove a filter above, or clear them all to see the full list.")
         st.button("Clear search and filters", on_click=_clear_filters, key="clear_filters_empty",
                   type="primary", icon=":material/filter_alt_off:")
@@ -106,7 +110,7 @@ def render(svc) -> None:
     _search_and_filters(common.cached_options(str(svc.db_path)))
 
     sort = st.session_state.get("f_sort") or "deadline"
-    views = common.cached_search(str(svc.db_path), today.isoformat(), common.filters_key(common.find_filters()),
+    views = common.cached_search(str(svc.db_path), common.time_key(svc), common.filters_key(common.find_filters()),
                                  sort)
     active = _active_filters()
 

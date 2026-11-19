@@ -76,7 +76,7 @@ PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_fil
 # Temporary selections (not widgets) that must not survive a dataset switch.
 MODE_SCOPED_KEYS = ("selected_id", "review_back", "match_results", "match_profile", "tracker_pick",
                     "confirm_apply", "confirm_error", "just_applied", "app_message", "saved_undo",
-                    "app_remove", "app_removed", "advisor_chat", "advisor_error")
+                    "app_remove", "app_removed", "chat_log", "chat_pending", "chat_context_id")
 PAGE_SIZE = 10
 
 

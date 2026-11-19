@@ -1,0 +1,87 @@
+# Scheduled refresh of ScholarPath's real-source dataset.
+#
+# GitHub runs this once a day. The refresh command itself decides whether work is due:
+# it collects only when 15 days have elapsed since the last SUCCESSFUL refresh (recorded
+# in data/refresh/state.json), so a failed attempt is simply retried the next day.
+# Scheduled runs are best-effort: GitHub may start them late, especially at busy times,
+# and only runs them from the repository's default branch (see docs/DATA_REFRESH.md).
+#
+# Manual run: Actions tab -> "Refresh scholarship data" -> Run workflow. Tick "force" to
+# refresh before it is due, or "dry run" to check the sources without changing anything.
+name: Refresh scholarship data
+
+on:
+  schedule:
+    - cron: "37 2 * * *"        # daily at 02:37 UTC (08:07 IST); off the busy top of the hour
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Refresh now, even if 15 days have not passed"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Collect and validate only; publish and commit nothing"
+        type: boolean
+        default: false
+
+# Never two refreshes at once; a queued run waits instead of cancelling the running one.
+concurrency:
+  group: scholarpath-data-refresh
+  cancel-in-progress: false
+
+permissions: {}                  # nothing by default; the job asks only for what it needs
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write            # to commit the refreshed dataset and its status file
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run the test suite (no refresh if the code is broken)
+        run: python -m pytest -q
+
+      - name: Refresh (only does work when due, forced or a dry run)
+        id: refresh
+        continue-on-error: true  # a failed refresh still records its status below
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          args=()
+          if [ "$FORCE" = "true" ]; then args+=(--force); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          python -m scholarpath refresh "${args[@]}"
+
+      - name: Commit the refreshed data (only if a file actually changed)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          for f in data/collected/real_scholarships.json data/refresh/state.json; do
+            if [ -e "$f" ]; then git add "$f"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "No meaningful change; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh scholarship data ($(date -u +%Y-%m-%d))"
+          git push
+
+      - name: Report a failed refresh
+        if: ${{ steps.refresh.outcome == 'failure' }}
+        run: |
+          echo "::error::The refresh failed. The previously published dataset was kept unchanged; see the step above."
+          exit 1

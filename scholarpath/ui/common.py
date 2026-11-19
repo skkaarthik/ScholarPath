@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from pathlib import Path
 from urllib.parse import urlparse
 
 import streamlit as st
@@ -23,7 +24,7 @@ from ..cleaning import is_http_url
 from ..dates import STATUS_LABELS
 from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord
 from ..repository import SearchFilters
-from ..services import STORAGE_ERRORS, ScholarPathService, ServiceError
+from ..services import STORAGE_ERRORS, ImportFailed, ScholarPathService, ServiceError
 
 # slug -> (title in the menu, icon). The app follows one sequence:
 # Find a scholarship -> Review it -> Apply on the provider's site -> Track the application.
@@ -277,6 +278,43 @@ def cached_overview(db_path: str, when: str) -> dict:
 @st.cache_data(show_spinner=False)
 def cached_options(db_path: str) -> dict:
     return _svc_for(db_path).filter_options()
+
+
+# --- the published real dataset reaches the running app ------------------------------------
+
+@st.cache_data(show_spinner=False)
+def _published_version(path: str, modified_ns: int) -> str | None:
+    """The published dataset's version; re-read only when the file itself changes."""
+    from ..refresh import load_published
+
+    return load_published(Path(path))["dataset_version"]
+
+
+@st.cache_resource(show_spinner=False)
+def _sync_once(db_path: str, version: str, db_existed: bool) -> str:
+    """Import a published version into the Real database once per server process.
+
+    cache_resource is shared by every session, so concurrent visitors trigger one import;
+    the import itself is transactional and idempotent. After an import every cached read
+    is dropped, so no session keeps showing the previous dataset."""
+    result = _svc_for(db_path).sync_published(config.REAL_DATASET_FILE)
+    if result == "imported":
+        st.cache_data.clear()
+    return result
+
+
+def sync_published_data() -> None:
+    """Called by app.py on every run; cheap unless the published dataset changed."""
+    path = Path(config.REAL_DATASET_FILE)
+    if not path.exists():
+        return
+    real_db = config.db_path(config.MODE_REAL)
+    try:
+        version = _published_version(str(path), path.stat().st_mtime_ns)
+        if version:
+            _sync_once(str(real_db), version, real_db.exists())
+    except (ImportFailed, ValueError, OSError, *STORAGE_ERRORS):
+        pass   # the last imported data stays usable; the next run tries again (failures are not cached)
 
 
 def all_views(svc: ScholarPathService, sort: str = "deadline", include_closed: bool = False):

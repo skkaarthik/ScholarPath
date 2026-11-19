@@ -194,3 +194,36 @@ def test_live_fetcher_reports_404_status_for_unavailable_pages():
     with pytest.raises(FetchError) as info:
         fetcher(session).get("https://example.org/gone")
     assert info.value.status == 404
+
+
+def test_cscuk_reads_exact_closing_times_and_pages_that_say_closed():
+    """Fixture-based (saved pages of 12 Nov 2026; the live pages read through a browser on
+    19 Nov 2026 said the same). An exact time with its zone becomes deadline_at; "now closed"
+    marks the record closed without inventing a date."""
+    from scholarpath.collectors.runner import make_fetcher
+
+    report = run_collection(["cscuk"], use_snapshots=True, fetcher_factory=make_fetcher)
+    by_name = {r["name"]: r for r in report.records}
+    shared = by_name["Commonwealth Shared Scholarships"]
+    assert (shared["deadline_date"], shared["deadline_at"]) == ("2026-12-08", "2026-12-08T16:00:00+00:00")
+    assert shared["closed_by_source"] is False and shared["deadline_timezone"] == "Europe/London"
+    masters = by_name["Commonwealth Master’s Scholarships"]
+    assert masters["closed_by_source"] is True
+    assert masters["deadline_kind"] == "unknown" and masters["deadline_at"] is None   # "20 October" has no year
+
+
+@pytest.mark.parametrize("sentence, day, expected", [
+    ("The closing date is 16:00 GMT on Tuesday 8 December 2026.", "2026-12-08", "2026-12-08T16:00:00+00:00"),
+    ("Closes 16:00 BST on 20 October 2026.", "2026-10-20", "2026-10-20T15:00:00+00:00"),
+    ("Deadline: 23:59 (CET), 15 January 2027.", "2027-01-15", "2027-01-15T22:59:00+00:00"),
+    ("Deadline 5pm GMT 1 March 2027", "2027-03-01", "2027-03-01T17:00:00+00:00"),
+    ("The closing date is 8 December 2026.", "2026-12-08", None),                   # no time: date-only rule
+    ("Closes at 16:00 on 8 December 2026.", "2026-12-08", None),                    # no zone: not guessed
+    ("16:00 GMT on Tuesday 20 October.", None, None),                                # no year: unknown
+])
+def test_closing_times_are_read_only_when_time_zone_and_full_date_are_stated(sentence, day, expected):
+    from datetime import date
+
+    from scholarpath.collectors.htmltools import parse_closing_time
+
+    assert parse_closing_time(sentence, date.fromisoformat(day) if day else None) == expected

@@ -227,3 +227,60 @@ def test_closing_times_are_read_only_when_time_zone_and_full_date_are_stated(sen
     from scholarpath.collectors.htmltools import parse_closing_time
 
     assert parse_closing_time(sentence, date.fromisoformat(day) if day else None) == expected
+
+
+# --- DAAD (fixture-based: one entry copied verbatim from the live listing of 19 Nov 2026) ----
+
+class _Pages:
+    """Serves given HTML per listing page number; records which pages were asked for."""
+
+    def __init__(self, pages):
+        self.pages, self.asked = pages, []
+
+    def get(self, url):
+        number = int(url.split("&page=")[1].split("&")[0])
+        self.asked.append(number)
+        return FetchedPage(url, self.pages[number], "2026-11-19T10:00:00+00:00", "browser_snapshot")
+
+
+def _daad_fixture():
+    return (FIXTURES / "daad_listing_one_entry.html").read_text(encoding="utf-8")
+
+
+def test_daad_listing_entry_becomes_a_cautious_valid_record():
+    from scholarpath.collectors import daad
+
+    items = list(daad.collect(_Pages({1: _daad_fixture()}), "2026-11-19T10:00:00+00:00"))
+    assert [kind for kind, _ in items] == ["record"]
+    record = validate_record(items[0][1])
+    assert record.name == "Study Scholarships - Master Studies for All Academic Disciplines"
+    assert record.provider == "DAAD" and record.host_countries == ["Germany"]
+    assert (record.degrees.kind, record.degrees.values) == ("list", ["master"])          # "Graduates"
+    assert record.subjects.kind == "unrestricted"                                         # all 7 subject groups
+    assert record.nationalities.kind == "unknown"                                          # "Only specified"
+    assert record.deadline_kind == "unknown" and record.deadline_date is None             # never guessed
+    assert record.source_url.startswith("https://www2.daad.de/") and "detail=50026200" in record.source_url
+    assert record.source_key == "50026200" and record.manual_verified_at is None
+
+
+def test_daad_follows_pages_until_the_stated_total_and_never_imports_a_partial_list():
+    from scholarpath.collectors import daad
+
+    one = _daad_fixture()
+    two_total = one.replace("1 Scholarship options", "2 Scholarship options")
+    second = two_total.replace("detail=50026200", "detail=57742121").replace(
+        "Study Scholarships - Master Studies for All Academic Disciplines", "Research Grants in Germany")
+    pages = _Pages({1: two_total, 2: second})
+    items = list(daad.collect(pages, "2026-11-19T10:00:00+00:00"))
+    assert pages.asked == [1, 2] and [k for k, _ in items] == ["record", "record"]
+    stuck = _Pages({1: two_total, 2: two_total})                                            # page 2 adds nothing
+    items = list(daad.collect(stuck, "2026-11-19T10:00:00+00:00"))
+    assert [k for k, _ in items] == ["failed"] and "Only 1 of 2" in items[0][1]["error"]
+
+
+def test_daad_is_configured_but_not_enabled_until_verified_live():
+    from scholarpath.collectors import daad
+    from scholarpath.collectors.runner import SOURCES, enabled_source_ids
+
+    assert "daad" in SOURCES and daad.ENABLED is False
+    assert enabled_source_ids() == ["cscuk", "great_india"]

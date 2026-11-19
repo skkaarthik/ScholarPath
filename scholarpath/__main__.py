@@ -23,7 +23,7 @@ from datetime import date
 from pathlib import Path
 
 from . import config
-from .collectors.runner import SOURCES, CollectionError, run_collection, write_collection
+from .collectors.runner import SOURCES, CollectionError, enabled_source_ids, run_collection, write_collection
 from .database import backup
 from .examples import write_example_dataset
 from .services import ImportFailed, ScholarPathService
@@ -48,7 +48,7 @@ def cmd_init_examples(args) -> int:
 
 
 def cmd_collect(args) -> int:
-    sources = args.sources or list(SOURCES)
+    sources = args.sources or enabled_source_ids()
     mode = "saved browser snapshots" if args.from_snapshots else "live HTTP"
     print(f"Collecting {sources} from {mode} ...")
     report = run_collection(sources, use_snapshots=args.from_snapshots)
@@ -177,7 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_init_examples)
 
     p = sub.add_parser("collect", help="collect real scholarship pages into JSON")
-    p.add_argument("--sources", nargs="+", choices=sorted(SOURCES), help="default: all configured sources")
+    p.add_argument("--sources", nargs="+", choices=sorted(SOURCES), help="default: every enabled source")
     how = p.add_mutually_exclusive_group(required=True)
     how.add_argument("--from-snapshots", action="store_true", help="parse saved snapshots in data/snapshots/ (offline)")
     how.add_argument("--live", action="store_true", help="fetch the official pages over HTTP")

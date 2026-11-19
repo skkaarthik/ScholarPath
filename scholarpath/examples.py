@@ -28,6 +28,8 @@ def build_example_records(anchor: date, template_path: Path = config.EXAMPLE_TEM
         offset = record.pop("deadline_offset_days", None)
         if record.get("deadline_kind") == "dated":
             record["deadline_date"] = (anchor + timedelta(days=int(offset))).isoformat()
+            # Fictional deadlines close at the end of the day in the app's time zone.
+            record["deadline_timezone"] = config.APP_TIMEZONE_NAME
         else:
             record["deadline_date"] = None
         key = record["source_key"]

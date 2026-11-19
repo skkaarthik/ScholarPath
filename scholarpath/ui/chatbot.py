@@ -1,10 +1,15 @@
-"""The ScholarPath assistant: a compact "Ask ScholarPath" button on every page that opens a chat panel.
+"""The ScholarPath assistant: an "Ask ScholarPath" button that opens a chat window in the
+bottom-right corner of every page (a sheet above the menu bar on phones).
 
-The panel shows what the assistant is talking about (the scholarship open on Review, or the
-whole dataset), up to three starter questions, the conversation, a question field with Send
-and a Clear chat action. Answers come from ScholarPathService.chat(), which runs on the server;
-the browser never sees the API key. The assistant is read-only: scholarship links open the
-Review page, where the student uses the normal buttons to save or mark as applied.
+The window shows what the assistant is talking about (the scholarship open on Review, or the
+whole dataset), up to three starter questions, the conversation, a question field with Send,
+and Clear chat / Close in its header. It is not a modal: the page stays visible and usable.
+Answers come from ScholarPathService.chat(), which runs on the server; the browser never sees
+the API key. The assistant is read-only: scholarship links open the Review page, where the
+student uses the normal buttons to save or mark as applied.
+
+Every part is drawn inside containers keyed "chat_*", which style.py uses for the layout and
+the site's colours (lavender highlight, indigo text, white sheet, hairline border).
 """
 
 from __future__ import annotations
@@ -56,6 +61,14 @@ def _send() -> None:
     _ask(st.session_state.get("chat_input", ""))
 
 
+def _open() -> None:
+    st.session_state["chat_open"] = True
+
+
+def _close() -> None:
+    st.session_state["chat_open"] = False
+
+
 def _clear() -> None:
     for key in ("chat_log", "chat_pending", "chat_context_id"):
         st.session_state.pop(key, None)
@@ -82,11 +95,11 @@ def _note_context_change(sid: str | None, label: str) -> None:
 def _references(item: dict, index: int, page: str) -> None:
     back = page if page in common.BACK_LABELS else "find"
     for n, ref in enumerate(item.get("refs", [])):
-        with st.container(horizontal=True, key=f"chat_ref_row_{index}_{n}"):
-            if st.button(f"Review: {ref['name']}", key=f"chat_ref_{index}_{n}", icon=":material/arrow_forward:",
+        with st.container(horizontal=True, key=f"chat_ref_{index}_{n}", gap="small"):
+            if st.button(ref["name"], key=f"chat_review_{index}_{n}", icon=":material/arrow_forward:",
                          icon_position="right", type="tertiary"):
                 common.go_to("review", ref["id"], back=back)
-                st.rerun()                       # leaves the panel and opens the page
+                st.rerun()                       # full rerun: opens the page, the window stays open
             common.safe_link_button("Official page", ref["url"], key=f"chat_link_{index}_{n}",
                                     icon=":material/open_in_new:", icon_position="right", type="tertiary")
 
@@ -96,21 +109,22 @@ def _show(item: dict, index: int, page: str) -> None:
     if role == "note":
         st.caption(f":material/swap_horiz: {common.md_escape(item['text'])}")
     elif role == "user":
-        with st.chat_message("user", avatar=":material/person:"):
+        with st.container(key=f"chat_user_{index}"):
             st.markdown(common.md_escape(item["text"]))
     elif role == "error":
         ERROR_STYLE.get(item["kind"], st.error)(item["text"], icon=":material/error:")
     else:
-        with st.chat_message("assistant", avatar=":material/school:"):
+        with st.container(key=f"chat_bot_{index}"):
             if item.get("demo"):
-                st.caption(":material/science: **Demonstration answer**: built directly from ScholarPath's "
-                           "records, without AI.")
+                st.caption(":material/science: Demonstration answer: from ScholarPath's records, without AI")
             st.markdown(item["text"])
             if item.get("invented"):
                 st.warning("Part of this answer refers to a scholarship that is not in ScholarPath's records. "
                            "Ignore that part; only the scholarships linked below are real records.",
                            icon=":material/warning:")
-            _references(item, index, page)
+            if item.get("refs"):
+                st.caption("Scholarships in this answer")
+                _references(item, index, page)
 
 
 def _answer(svc, question: str, current_id: str | None, page: str) -> None:
@@ -127,7 +141,7 @@ def _answer(svc, question: str, current_id: str | None, page: str) -> None:
     if time.monotonic() - ss.get("chat_last", -MIN_GAP_SECONDS) < MIN_GAP_SECONDS:
         log.append({"role": "error", "kind": "quota", "text": "Please wait a few seconds between questions."})
         return
-    with st.chat_message("assistant", avatar=":material/school:"):
+    with st.container(key="chat_thinking"):
         with st.spinner("Checking ScholarPath's records..."):
             try:
                 reply = svc.chat(question, history, current_id, ss.get("match_profile"))
@@ -148,58 +162,79 @@ def _answer(svc, question: str, current_id: str | None, page: str) -> None:
                          for c in reply.references]})
 
 
-def body(page: str, in_dialog: bool = True) -> None:
-    """The panel's contents. Drawn inside the dialog; tests draw it directly (in_dialog=False)."""
+def _header(page: str, label: str, live: bool) -> None:
+    with st.container(key="chat_head", horizontal=True, vertical_alignment="center", gap="small"):
+        with st.container(key="chat_icon", width="content"):       # the lavender icon tile (style.py)
+            st.markdown(":material/forum:")
+        with st.container(key="chat_title"):
+            st.markdown("**ScholarPath assistant**")
+            st.caption(f"Talking about: {common.md_escape(label)}")
+        if _log():
+            st.button("Clear chat", key="chat_clear", on_click=_clear, type="tertiary",
+                      icon=":material/delete_sweep:")
+        if st.button("Close", key="chat_close", type="tertiary", icon=":material/close:"):
+            _close()
+            st.rerun()                           # full rerun: removes the window, shows the button again
+    with st.container(key="chat_status", gap=None):
+        _status(live)
+
+
+def _status(live: bool) -> None:
+    if live:
+        st.caption(f"AI answers ({provider_name(settings_from_env())}) from ScholarPath's records. They can be "
+                   "wrong, so check the official page. Leave out personal details.")
+    else:
+        st.caption(":material/science: **Demonstration mode**: no AI provider is set up, so answers come "
+                   "straight from ScholarPath's records.")
+    if st.session_state.get("match_profile") is not None:
+        st.caption(":material/fact_check: Using your Check my fit answers.")
+
+
+def body(page: str, in_fragment: bool = True) -> None:
+    """The window's contents. Drawn in a fragment, so sending a question redraws only the window."""
     svc = common.service()
     sid, label = _context(svc, page)
     _note_context_change(sid, label)
-    live = settings_from_env() is not None
-
-    with st.container(key="chat_head"):
-        st.markdown(f":material/target: **Talking about:** {common.md_escape(label)}")
-        if st.session_state.get("match_profile") is not None:
-            st.caption("Using your Check my fit answers for eligibility.")
-        if live:
-            st.caption(f"Answers are written by AI ({provider_name(settings_from_env())}) from ScholarPath's records "
-                       "and can be wrong: check facts on the official page. Your question is sent to the provider, "
-                       "so leave out personal details.")
-        else:
-            st.info("**Demonstration mode.** No AI provider is configured, so answers are built directly from "
-                    "ScholarPath's records. Set up an API key to get full answers (see README).",
-                    icon=":material/science:")
+    _header(page, label, settings_from_env() is not None)
 
     log = _log()
-    for i, item in enumerate(log):
-        _show(item, i, page)
-    pending = st.session_state.pop("chat_pending", None)
-    if pending is not None:
-        _answer(svc, pending, sid, page)
-        st.rerun(scope="fragment" if in_dialog else "app")   # redraw so the reply's buttons are in the log
+    with st.container(key="chat_msgs"):                # scrolls; newest message stays in view
+        with st.container(key="chat_msgs_inner"):
+            for i, item in enumerate(log):
+                _show(item, i, page)
+            pending = st.session_state.pop("chat_pending", None)
+            if pending is not None:
+                _answer(svc, pending, sid, page)
+                st.rerun(scope="fragment" if in_fragment else "app")   # redraw with the reply's links
+            if not log:
+                st.caption("Ask anything about scholarships, eligibility or your applications. For example:")
+                with st.container(key="chat_starters", gap="small"):
+                    for n, text in enumerate(STARTERS.get(page, STARTERS["default"])[:3]):
+                        st.button(text, key=f"chat_starter_{n}", on_click=_ask, args=(text,), width="stretch")
 
-    if not log:
-        st.caption("Try one of these:")
-        with st.container(key="chat_starters"):
-            for n, text in enumerate(STARTERS.get(page, STARTERS["default"])[:3]):
-                st.button(text, key=f"chat_starter_{n}", on_click=_ask, args=(text,), width="stretch")
-
-    with st.form("chat_form", clear_on_submit=True, border=False, enter_to_submit=True):
-        st.text_input("Your question", key="chat_input", max_chars=800, label_visibility="collapsed",
-                      placeholder="Ask about scholarships, eligibility or your applications")
-        with st.container(horizontal=True, key="chat_actions"):
-            st.form_submit_button("Send", on_click=_send, type="primary", icon=":material/send:")
-    if log:
-        st.button("Clear chat", key="chat_clear", on_click=_clear, type="tertiary", icon=":material/delete_sweep:")
+    with st.container(key="chat_foot"):
+        with st.form("chat_form", clear_on_submit=True, border=False, enter_to_submit=True):
+            with st.container(key="chat_input_row", horizontal=True, vertical_alignment="bottom", gap="small"):
+                # No max_chars here (its counter crowds the narrow field); 800 is enforced on the server.
+                st.text_input("Your question", key="chat_input", label_visibility="collapsed",
+                              placeholder="Ask a question...")
+                st.form_submit_button("Send", on_click=_send, type="primary", icon=":material/send:")
 
 
-_panel = st.dialog("ScholarPath assistant", width="large")(body)
+@st.fragment
+def _window(page: str) -> None:
+    with st.container(key="chat_panel"):
+        body(page)
 
 
 def entry(page: str) -> None:
-    """The compact entry point, fixed at the bottom-right corner by style.py (key "chat_fab")."""
+    """The "Ask ScholarPath" button (bottom right), or the open chat window in its place."""
     svc = common.service()
     if not svc.database_exists():
         return
-    with st.container(key="chat_fab"):
-        if st.button("Ask ScholarPath", key="chat_open", icon=":material/forum:",
-                     help="Ask the ScholarPath assistant about scholarships, eligibility or your applications"):
-            _panel(page)
+    if st.session_state.get("chat_open"):
+        _window(page)
+    else:
+        with st.container(key="chat_fab"):
+            st.button("Ask ScholarPath", key="chat_open_btn", on_click=_open, icon=":material/forum:",
+                      help="Ask the ScholarPath assistant about scholarships, eligibility or your applications")

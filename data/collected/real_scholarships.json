@@ -1,6 +1,6 @@
 {
   "dataset_origin": "real_source",
-  "generated_at": "2026-11-12T10:09:48+00:00",
+  "generated_at": "2026-11-19T13:38:45+00:00",
   "collection_counts": {
     "accepted": 16,
     "rejected": 0,
@@ -124,13 +124,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/anglia-ruskin-university",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-93eae6c66cc23e0e",
@@ -215,13 +218,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/norwich-university-arts",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-d8247db2dfa64302",
@@ -311,13 +317,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/queens-university-belfast",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-726f6ea254a59e12",
@@ -402,13 +411,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/royal-college-art",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-f113c36b489b669c",
@@ -498,13 +510,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/royal-conservatoire-scotland",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-ad5d9c4fe19b795a",
@@ -589,13 +604,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/royal-northern-college-music",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-517a11bbdd7bfe68",
@@ -680,13 +698,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/trinity-laban",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details. A deadline is mentioned without a full date; recorded as unknown.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-c8c01a95a9d62790",
@@ -772,13 +793,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/university-bristol",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-eb36595f3b2ca309",
@@ -864,13 +888,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/university-dundee",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-c648d703bb937734",
@@ -960,13 +987,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/university-kent",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-dce81ec6956fe38f",
@@ -1051,13 +1081,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/university-reading",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-d7661dd8aabf885b",
@@ -1143,13 +1176,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/university-surrey",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-b4a795b88389fdec",
@@ -1235,13 +1271,16 @@
       "source_name": "British Council Study UK - GREAT Scholarships",
       "source_key": "great/university-west-england",
       "award_cycle": "2026-27",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:00:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Award amount is paid towards tuition fees; check the university page for course and application details.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     },
     {
       "id": "sp-e819e5481af46d2f",
@@ -1367,13 +1406,16 @@
       "source_name": "Commonwealth Scholarship Commission in the UK",
       "source_key": "scholarships/commonwealth-masters-scholarships",
       "award_cycle": "2027/28",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:05:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Source status at collection: Applications for Commonwealth Master’s Scholarships for the 2027/28 academic year are now closed. The published closing date has no year, so it is recorded as unknown rather than guessed. Applications are made through the CSC's own application system as described on the source page.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": true
     },
     {
       "id": "sp-066f6f57d31e306c",
@@ -1478,13 +1520,16 @@
       "source_name": "Commonwealth Scholarship Commission in the UK",
       "source_key": "scholarships/commonwealth-phd-scholarships-for-least-developed-countries-and-vulnerable-states",
       "award_cycle": "2027/28",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:05:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Source status at collection: Applications for Commonwealth PhD Scholarships for the 2027/28 academic year are now closed. The published closing date has no year, so it is recorded as unknown rather than guessed. Applications are made through the CSC's own application system as described on the source page.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": null,
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": true
     },
     {
       "id": "sp-7203735a9091429c",
@@ -1620,13 +1665,16 @@
       "source_name": "Commonwealth Scholarship Commission in the UK",
       "source_key": "scholarships/commonwealth-shared-scholarships-applications",
       "award_cycle": "2027/28",
-      "collected_at": "2026-11-12T10:09:47+00:00",
+      "collected_at": "2026-11-19T13:38:45+00:00",
       "source_fetched_at": "2026-11-12T10:05:00+00:00",
       "fetch_method": "browser_snapshot",
       "manual_verified_at": null,
       "dataset_origin": "real_source",
       "notes": "Source status at collection: Applications for Commonwealth Shared Scholarships for the 2027/28 academic year are now open. Applications are made through the CSC's own application system as described on the source page.",
-      "source_status": "available"
+      "source_status": "available",
+      "deadline_at": "2026-12-08T16:00:00+00:00",
+      "deadline_timezone": "Europe/London",
+      "closed_by_source": false
     }
   ]
 }

@@ -106,6 +106,19 @@ a run with failed pages writes a separate `*.partial-*.json` file unless you pas
 missing from one run. **Live collection has not been verified from the development
 environment** (see [docs/SOURCES.md](docs/SOURCES.md)).
 
+## Automatic data refresh
+
+The real dataset is refreshed by a daily GitHub Actions check that collects the official sources
+only when 15 days have passed since the last successful refresh. A refresh that fails or looks
+wrong publishes nothing, and the previous data stays in use. Closed scholarships disappear from
+Find Scholarships as soon as their deadline passes; saved and tracked ones are kept and marked
+Closed. Setup, activation, manual runs and failure recovery: [docs/DATA_REFRESH.md](docs/DATA_REFRESH.md).
+
+```
+python -m scholarpath refresh --dry-run   # check the sources, write nothing
+python -m scholarpath refresh --force     # refresh now, even if not due
+```
+
 ## ScholarPath assistant (AI chat)
 
 Every page has an **Ask ScholarPath** button (bottom right; a round button above the menu bar on

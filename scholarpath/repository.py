@@ -376,6 +376,12 @@ def history_insert(conn: sqlite3.Connection, application_id: int, values: dict, 
     )
 
 
+def application_delete(conn: sqlite3.Connection, application_id: int) -> None:
+    """Delete one tracker entry and its history (history first: its foreign key is ON DELETE RESTRICT)."""
+    conn.execute("DELETE FROM application_history WHERE application_id = ?", (application_id,))
+    conn.execute("DELETE FROM applications WHERE id = ?", (application_id,))
+
+
 def application_list(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return list(conn.execute("SELECT * FROM applications ORDER BY updated_at DESC, id DESC"))
 

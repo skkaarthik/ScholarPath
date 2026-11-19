@@ -20,6 +20,7 @@ from .htmltools import blocks, parse_full_date, sentence_containing, soup_of
 SOURCE_ID = "great_india"
 SOURCE_NAME = "British Council Study UK - GREAT Scholarships"
 ALLOWED_HOSTS = {"study-uk.britishcouncil.org"}
+TIMEZONE = "Europe/London"
 LISTING_URL = "https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/india"
 DETAIL_PREFIX = "/scholarships-funding/great-scholarships/"
 
@@ -204,6 +205,9 @@ def parse_detail(page: FetchedPage, listing: dict, collected_at: str) -> dict:
         "funding_description": funding,
         "deadline_kind": "dated" if deadline_date else "unknown",
         "deadline_date": deadline_date.isoformat() if deadline_date else None,
+        # Each UK university sets its own date; the page gives no time, so the date-only
+        # rule applies: open through the end of that day in UK time.
+        "deadline_timezone": TIMEZONE,
         "deadline_text": deadline_sentence,
         "eligibility_text": eligibility_text,
         "requirements": requirements,

@@ -17,11 +17,13 @@ from urllib.parse import urlparse
 
 from ..models import stable_id
 from .base import FetchedPage, StructureError
-from .htmltools import blocks, parse_full_date, sentence_containing, soup_of
+from .htmltools import blocks, parse_closing_time, parse_full_date, sentence_containing, soup_of
 
 SOURCE_ID = "cscuk"
 SOURCE_NAME = "Commonwealth Scholarship Commission in the UK"
 ALLOWED_HOSTS = {"cscuk.fcdo.gov.uk"}
+TIMEZONE = "Europe/London"   # CSC deadlines are UK times ("16:00 GMT/BST")
+CLOSED = re.compile(r"\bapplications\b[^.]*\b(?:are|is)\s+now\s+closed\b", re.I)
 PAGE_URLS = [
     "https://cscuk.fcdo.gov.uk/scholarships/commonwealth-masters-scholarships/",
     "https://cscuk.fcdo.gov.uk/scholarships/commonwealth-shared-scholarships-applications/",
@@ -113,6 +115,7 @@ def parse_page(page: FetchedPage, collected_at: str) -> dict:
     deadline_date = parse_full_date(deadline_sentence)
     cycle_match = re.search(r"for the (\d{4}/\d{2}) academic year", apply_text)
     status_sentence = sentence_containing(apply_text, "are now") or ""
+    closed_by_source = bool(CLOSED.search(apply_text))   # e.g. "... for the 2027/28 academic year are now closed."
 
     requirements = []
     eligibility_items = sections["eligibility"]
@@ -169,6 +172,9 @@ def parse_page(page: FetchedPage, collected_at: str) -> dict:
         "funding_description": funding_text,
         "deadline_kind": "dated" if deadline_date else "unknown",
         "deadline_date": deadline_date.isoformat() if deadline_date else None,
+        "deadline_at": parse_closing_time(deadline_sentence, deadline_date),
+        "deadline_timezone": TIMEZONE,
+        "closed_by_source": closed_by_source,
         "deadline_text": deadline_sentence,
         "eligibility_text": " ".join(eligibility_items),
         "requirements": requirements,

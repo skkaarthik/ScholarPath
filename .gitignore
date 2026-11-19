@@ -34,3 +34,8 @@ backups/
 .DS_Store
 .idea/
 .vscode/
+
+# Scheduled refresh: lock and staging files (never committed)
+data/refresh/refresh.lock
+data/refresh/.state.json.tmp
+data/collected/.real_scholarships.json.staging

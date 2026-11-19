@@ -25,10 +25,14 @@ def isolated_data_dir(tmp_path, monkeypatch):
     """Point every database at a temp folder and pin 'today'."""
     monkeypatch.setenv("SCHOLARPATH_DATA_DIR", str(tmp_path / "db"))
     monkeypatch.setenv("SCHOLARPATH_TODAY", FIXED_TODAY.isoformat())
-    # The AI advisor is off unless a test switches it on, and it can never reach the network.
-    for name in ("SCHOLARPATH_AI_API_KEY", "SCHOLARPATH_AI_BASE_URL", "SCHOLARPATH_AI_MODEL"):
-        monkeypatch.delenv(name, raising=False)
+    # The assistant is off unless a test switches it on, never reads a real key from this
+    # computer's .env or secrets.toml, and can never reach the network.
     from scholarpath import advisor
+
+    for name in advisor.SETTING_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SCHOLARPATH_AI_NO_LOCAL", "1")
+    monkeypatch.setattr(advisor, "reset_limiter", lambda: None)
 
     def no_network(*args, **kwargs):
         raise AssertionError("tests must not call the AI provider")

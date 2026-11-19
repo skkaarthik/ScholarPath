@@ -14,7 +14,11 @@ validates and writes `data/collected/real_scholarships.json` → `import-real`
 
 - No SQL, HTTP or JSON-file reads in UI modules.
 - Matching (`matching.py`) and date logic (`dates.py`) are pure; inject `today`.
-- Never scrape from the UI. Real data changes only via explicit CLI commands.
+- Never scrape from the UI. Real data changes only via explicit commands (`refresh`, `collect`,
+  `import-real`); the app may only *import* the published, validated dataset file when its
+  version changes (no network). See docs/DATA_REFRESH.md.
+- Closing is decided by `dates.closes_at`/`is_closed` (source time zone; Anywhere on Earth when
+  unknown). Closed records leave discovery but are never deleted.
 
 ## Data rules
 - Canonical record: `models.ScholarshipRecord`; validate with `cleaning.validate_record`.

@@ -75,7 +75,8 @@ FIT_KEYS = tuple(FIT_DEFAULTS)
 PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_filters", "mode")
 # Temporary selections (not widgets) that must not survive a dataset switch.
 MODE_SCOPED_KEYS = ("selected_id", "review_back", "match_results", "match_profile", "tracker_pick",
-                    "confirm_apply", "confirm_error", "just_applied", "app_message", "saved_undo")
+                    "confirm_apply", "confirm_error", "just_applied", "app_message", "saved_undo",
+                    "app_remove", "app_removed")
 PAGE_SIZE = 10
 
 
@@ -110,6 +111,8 @@ def enter_page(page: str) -> None:
             ss.pop("confirm_error", None)
         if page != "applications":
             ss.pop("tracker_pick", None)
+            ss.pop("app_remove", None)              # "Remove" was chosen but not confirmed
+            ss.pop("app_removed", None)             # the note that an entry was removed
     ss["_page"] = page
 
 

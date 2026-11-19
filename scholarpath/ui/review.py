@@ -2,8 +2,7 @@
 
 Reading order: title and provider, the four facts a student needs first
 (deadline, who can apply, where, funding), then Apply, then the detailed
-eligibility, deadline, funding and source. If an AI key is configured, an
-"Ask the AI advisor" section at the end answers questions about this scholarship.
+eligibility, deadline, funding and source.
 
 The Apply section always shows one main action for the scholarship's state:
 
@@ -260,55 +259,6 @@ def _source(rec) -> None:
         st.caption(f"Record ID: {rec.id}")
 
 
-# --- AI advisor ------------------------------------------------------------------------
-
-ADVISOR_LIMIT = 15  # questions per browser session, so one visitor cannot use up the shared free quota
-
-
-def _ask_advisor(svc, scholarship_id: str) -> None:
-    """Form callback: send the question; store the answer or the reason it failed."""
-    ss = st.session_state
-    question = (ss.get(f"adv_q_{scholarship_id}") or "").strip()
-    history = ss.setdefault("advisor_chat", {}).setdefault(scholarship_id, [])
-    ss.pop("advisor_error", None)
-    if not question:
-        ss["advisor_error"] = "Type a question first."
-        return
-    if ss.get("advisor_count", 0) >= ADVISOR_LIMIT:
-        ss["advisor_error"] = (f"You have asked {ADVISOR_LIMIT} questions in this visit, "
-                               "the limit for the free service.")
-        return
-    try:
-        answer = svc.ask_advisor(scholarship_id, question, history)
-    except ServiceError as exc:
-        ss["advisor_error"] = str(exc)
-        return
-    history.append((question, answer))
-    ss["advisor_count"] = ss.get("advisor_count", 0) + 1
-
-
-def _advisor(svc, rec) -> None:
-    if not svc.advisor_available():
-        return
-    with st.expander("Ask the AI advisor", key="r_advisor", icon=":material/forum:"):
-        st.caption("Ask about this scholarship or how to prepare your application. Answers come from an AI "
-                   "and can be wrong: facts are taken only from ScholarPath's record, so always check the "
-                   "official page. Your question is sent to an outside AI service, so leave out personal details.")
-        for question, answer in st.session_state.get("advisor_chat", {}).get(rec.id, []):
-            with st.chat_message("user", avatar=":material/person:"):
-                st.markdown(common.md_escape(question))
-            with st.chat_message("assistant", avatar=":material/school:"):
-                st.markdown(answer)
-        problem = st.session_state.pop("advisor_error", None)
-        if problem:
-            st.error(problem, icon=":material/error:")
-        with st.form(f"adv_form_{rec.id}", clear_on_submit=True, border=False):
-            st.text_area("Your question", key=f"adv_q_{rec.id}", max_chars=1000, height=90,
-                         placeholder="e.g. What documents should I prepare, and what should my personal "
-                                     "statement focus on?")
-            st.form_submit_button("Ask", on_click=_ask_advisor, args=(svc, rec.id), icon=":material/send:")
-
-
 def render(svc) -> None:
     back = st.session_state.get("review_back")
     if back not in common.BACK_LABELS:
@@ -345,4 +295,3 @@ def render(svc) -> None:
     _eligibility(rec)
     _deadline_and_funding(view, today)
     _source(rec)
-    _advisor(svc, rec)

@@ -400,8 +400,10 @@ def test_review_without_a_selection_points_back_to_find(seeded):
 def test_data_page_reports_sources_and_honest_freshness(seeded):
     at = goto(run_app(), "data")
     metrics = {m.label: m.value for m in at.metric}
-    assert metrics["Records"] == "15" and metrics["Checked by hand"] == "0 of 15"
-    assert "no automatic schedule" in texts(at) and "python -m scholarpath init-examples" in texts(at)
+    assert metrics["Open now"] == "13" and metrics["All records"] == "15"   # 2 closed records are kept
+    assert metrics["Checked by hand"] == "0 of 15"
+    assert "Nothing is collected while you browse" in texts(at) and "python -m scholarpath init-examples" in texts(at)
+    assert "Data refresh" not in [h.value for h in at.header]                # refresh concerns real data only
 
 
 def test_database_failure_shows_recovery_message_not_a_traceback(seeded, monkeypatch):
@@ -764,7 +766,7 @@ def test_data_page_switches_dataset_and_keeps_the_two_apart(seeded, example_reco
     body = texts(at)
     assert at.session_state["mode"] == config.MODE_REAL and "Showing: Real sources (collected)" in body
     assert {m.label: m.value for m in at.metric}["Checked by hand"] == "0 of 1"
-    assert "has not been verified" in body and "should be treated as live" in body
+    assert "not live" in body and "No automatic refresh has run yet" in body
     assert real.saved_ids() == [] and seeded.saved_ids() == [example_records[0]["id"]]  # nothing crossed over
     click(at, "data_switch")
     assert at.session_state["mode"] == config.MODE_EXAMPLE

@@ -71,16 +71,15 @@ def render(svc) -> None:
     common.page_header(svc, "Insights", "A simple picture of what is in this dataset. Counts only, no predictions.")
     if not common.dataset_ready(svc):
         return
-    today = svc.today()
     use_filters = st.toggle("Only count scholarships that match my Find Scholarships filters", key="ins_filters")
     filters = common.find_filters() if use_filters else SearchFilters()
     views = common.cached_search(str(svc.db_path), common.time_key(svc), common.filters_key(filters), "name")
     if use_filters and filters.is_empty():
-        scope = "no filters set on Find Scholarships, so every record"
+        scope = "no filters set on Find Scholarships, so every open record"
     elif use_filters:
         scope = "your current Find Scholarships filters"
     else:
-        scope = "no filters, so every record"
+        scope = "no filters, so every open record (closed ones are left out)"
     st.markdown(f"Counting **{common.plural(len(views), 'scholarship')}** from the "
                 f"*{config.MODE_LABELS[svc.mode]}* dataset, with {scope}.")
     if not views:

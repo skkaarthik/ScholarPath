@@ -14,7 +14,8 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from .. import config
+from .. import config, refresh
+from ..collectors import runner
 from . import common
 
 EXPLAIN = {
@@ -25,7 +26,8 @@ EXPLAIN = {
 }
 COMMANDS = {
     config.MODE_EXAMPLE: "python -m scholarpath init-examples",
-    config.MODE_REAL: "python -m scholarpath collect --from-snapshots\npython -m scholarpath import-real",
+    config.MODE_REAL: "python -m scholarpath refresh --force   # collect live, validate, publish\n"
+                      "python -m scholarpath refresh --dry-run # check the sources without writing anything",
 }
 
 
@@ -90,6 +92,49 @@ def _sources(views) -> None:
             st.caption("Example data: these addresses are placeholders on example.org, not real pages.")
 
 
+@st.cache_data(show_spinner=False)
+def _refresh_state(path: str, modified_ns: int) -> dict:
+    return refresh.load_state(path)
+
+
+def _when(ts: str | None) -> str:
+    return common.fmt_ts(ts) if ts else "Never"
+
+
+def _refresh_status(svc) -> None:
+    """When the published real data was last refreshed, when the next refresh is due, and how the
+    latest attempt went. Read from data/refresh/state.json, written only by the refresh command."""
+    st.header("Data refresh", anchor=False)
+    path = refresh.STATE_FILE
+    state = _refresh_state(str(path), path.stat().st_mtime_ns) if path.exists() else refresh.load_state(path)
+    last, attempt = state.get("last_success_at"), state.get("latest_attempt") or {}
+    if not last and not attempt:
+        st.markdown("No automatic refresh has run yet. The records below come from the last manual collection; "
+                    "the page each was read from and when is listed under Sources.")
+        st.caption("Once the GitHub workflow is switched on, ScholarPath checks every day and refreshes the data "
+                   "when 15 days have passed since the last successful refresh.")
+        return
+    due = refresh.next_due(state)
+    due_text = ("due now; the next daily check will run it" if due is None or due <= svc.now()
+                else common.fmt_ts(due.isoformat()))
+    st.markdown(f"**Last successful data refresh:** {_when(last)}  \n**Next refresh due:** {due_text}")
+    if attempt.get("status") == "failed":
+        st.warning(f"The latest refresh attempt ({_when(attempt.get('at'))}) failed, so the data from the last "
+                   "successful refresh is still shown. Nothing was changed.", icon=":material/warning:")
+        with st.expander("Why the latest attempt failed", key="data_refresh_problems", icon=":material/info:"):
+            st.markdown("\n".join(f"- {common.md_escape(p)}" for p in attempt.get("problems", [])))
+    sources = state.get("sources") or {}
+    if sources:
+        st.dataframe(pd.DataFrame([{
+            "Source": getattr(runner.SOURCES.get(sid), "SOURCE_NAME", sid),
+            "Latest attempt": "Read without problems" if info.get("status") == "ok" else "Failed",
+            "Records read": info.get("accepted", 0),
+            "Last success": _when(info.get("last_success_at")),
+        } for sid, info in sorted(sources.items())]), hide_index=True, key="data_refresh_sources")
+    st.caption("Refreshed data is collected automatically from the official pages; it has not been checked by a "
+               "person. Closed scholarships leave Find as soon as their deadline passes, even between refreshes.")
+
+
 def _trust(svc, info: dict) -> None:
     st.header("How far to trust it", anchor=False)
     checked, total = info["verified_count"], info["scholarships"]
@@ -100,9 +145,8 @@ def _trust(svc, info: dict) -> None:
          "counts as checked only after someone compares it with the official page."),
     ]
     if svc.mode == config.MODE_REAL:
-        lines.append("These records were read from saved copies of the official pages. Downloading the pages "
-                     "directly (live collection) exists as a command, but it has not been verified in this "
-                     "project, so no record here should be treated as live.")
+        lines.append("Each record says how it was read: from a saved copy of the official page, or downloaded "
+                     "directly by the refresh. Either way, it shows the page as it was on that day, not live.")
     else:
         lines.append("Example records are invented. Their deadlines are generated around "
                      f"{common.fmt_iso_date(info.get('example_anchor_date'))} so the list always has open, "
@@ -125,9 +169,13 @@ def _technical(svc, info: dict) -> None:
             f"- **Source pages read between:** {common.fmt_ts(info['oldest_fetched'])} and "
             f"{common.fmt_ts(info['newest_fetched'])}"
         )
-        st.markdown("Data changes only when you run these commands in Terminal, inside the ScholarPath folder. "
-                    "Nothing is collected while you browse, and no automatic schedule is set up. "
-                    "After running them, reload this page.")
+        st.markdown("Nothing is collected while you browse. "
+                    + ("The real dataset changes only through the refresh command: on a schedule in GitHub "
+                       "Actions (once activated), or when you run it in Terminal inside the ScholarPath folder. "
+                       "A successful refresh is picked up by the app automatically."
+                       if svc.mode == config.MODE_REAL else
+                       "The example dataset is rebuilt only by this command, run in Terminal inside the "
+                       "ScholarPath folder; reload this page afterwards."))
         st.code(COMMANDS[svc.mode], language=None)
         st.caption(f"Database file: {svc.db_path}")
 
@@ -139,15 +187,20 @@ def render(svc) -> None:
     if not common.dataset_ready(svc):
         return
     info = common.cached_overview(str(svc.db_path), svc.today().isoformat())
-    views = common.all_views(svc, "name")
+    views = common.all_views(svc, "name", include_closed=True)   # this page describes the whole dataset
 
     with st.container(horizontal=True, key="facts_data"):
-        st.metric("Records", info["scholarships"], border=True)
+        st.metric("Open now", info["active"], border=True,
+                  help="Shown in Find Scholarships: not closed (rolling and unconfirmed dates included)")
+        st.metric("All records", info["scholarships"], border=True,
+                  help="Including closed ones, which are kept for saved items and applications")
         st.metric("Sources", len({v.record.source_name for v in views}), border=True)
         st.metric("Checked by hand", f"{info['verified_count']} of {info['scholarships']}", border=True,
                   help="Records a person has compared with the official page")
         st.metric("Pages unavailable", info["unavailable_count"], border=True)
 
+    if svc.mode == config.MODE_REAL:
+        _refresh_status(svc)
     _sources(views)
     _trust(svc, info)
     _technical(svc, info)

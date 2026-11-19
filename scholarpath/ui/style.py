@@ -128,6 +128,29 @@ h1, h2, h3 { overflow-wrap: anywhere; }             /* very long titles wrap ins
   .st-key-app_nav [class*="st-key-nav_"] button div[aria-hidden="true"] { display: none; }   /* no chevron in the bar */
 }
 
+/* --- Assistant ---------------------------------------------------------------------
+   "chat_fab" is the Ask ScholarPath button (ui/chatbot.py), pinned to the bottom-right corner;
+   on phones it sits above the menu bar. The panel itself is Streamlit's dialog. */
+.st-key-chat_fab { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 99; width: auto !important; }
+.st-key-chat_fab button {
+  min-height: 3rem; padding: 0 1.125rem; border-radius: 999px; border: 1px solid var(--sp-primary);
+  background: var(--sp-primary); color: #FFFFFF; box-shadow: 0 4px 14px rgba(52, 58, 140, 0.28);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.st-key-chat_fab button * { color: #FFFFFF !important; }
+@media (hover: hover) { .st-key-chat_fab button:hover { background: #2A2F75; border-color: #2A2F75; } }
+@media (max-width: 40rem) {
+  /* A round icon button on phones, so it covers less of the page. The label stays readable
+     by screen readers (visually hidden, not display:none). */
+  .st-key-chat_fab { right: 0.75rem; bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px)); }
+  .st-key-chat_fab button { width: 3.25rem; min-height: 3.25rem; padding: 0; justify-content: center; }
+  .st-key-chat_fab button p {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
+.st-key-chat_head { padding-bottom: 0.5rem; border-bottom: 1px solid var(--sp-line); }
+.st-key-chat_starters button, .st-key-chat_starters button > div { justify-content: flex-start; text-align: left; }
+
 /* --- Focus and motion --------------------------------------------------------------- */
 /* One clear keyboard-focus ring everywhere (WCAG 2.4.7 / 2.4.11). */
 :focus-visible { outline: 3px solid var(--sp-focus) !important; outline-offset: 2px !important; }

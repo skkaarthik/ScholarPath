@@ -25,6 +25,12 @@ def isolated_data_dir(tmp_path, monkeypatch):
     """Point every database at a temp folder and pin 'today'."""
     monkeypatch.setenv("SCHOLARPATH_DATA_DIR", str(tmp_path / "db"))
     monkeypatch.setenv("SCHOLARPATH_TODAY", FIXED_TODAY.isoformat())
+    # The app imports the published real dataset on start; tests get an empty, temporary one.
+    monkeypatch.setattr(config, "REAL_DATASET_FILE", tmp_path / "published" / "real_scholarships.json")
+    from scholarpath import refresh
+
+    monkeypatch.setattr(refresh, "STATE_FILE", tmp_path / "published" / "state.json")
+    monkeypatch.setattr(refresh, "LOCK_FILE", tmp_path / "published" / "refresh.lock")
     # The assistant is off unless a test switches it on, never reads a real key from this
     # computer's .env or secrets.toml, and can never reach the network.
     from scholarpath import advisor

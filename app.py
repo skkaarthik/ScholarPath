@@ -7,6 +7,8 @@ ScholarPathService. No scraping happens here.
 
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
 from scholarpath import config
@@ -16,6 +18,20 @@ from scholarpath.ui import (applications, common, data_sources, find, insights, 
 st.set_page_config(page_title="ScholarPath", page_icon=str(style.ASSETS / "icon.svg"), layout="wide")
 style.inject()
 common.keep_state()
+
+
+def _secrets_to_env() -> None:
+    """When hosted, the AI advisor's settings live in Streamlit secrets; the advisor reads them
+    from the environment. Locally there is usually no secrets file, and then nothing happens."""
+    try:
+        for name in ("SCHOLARPATH_AI_API_KEY", "SCHOLARPATH_AI_BASE_URL", "SCHOLARPATH_AI_MODEL"):
+            if name in st.secrets and not os.environ.get(name):
+                os.environ[name] = str(st.secrets[name])
+    except Exception:  # no secrets.toml, or an unreadable one: run without the advisor
+        pass
+
+
+_secrets_to_env()
 
 # The app follows one sequence: Find -> Review -> Apply -> Track.
 RENDERERS = {

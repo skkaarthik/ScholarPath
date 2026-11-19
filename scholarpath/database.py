@@ -166,6 +166,22 @@ MIGRATIONS: list[tuple[int, str, str]] = [
     ),
 ]
 
+MIGRATIONS.append((
+    3,
+    "closing instants: exact closing time, source time zone, stored closing instant, closed-by-source flag",
+    """
+    ALTER TABLE scholarships ADD COLUMN deadline_at TEXT;
+    ALTER TABLE scholarships ADD COLUMN deadline_timezone TEXT;
+    ALTER TABLE scholarships ADD COLUMN closes_at TEXT;
+    ALTER TABLE scholarships ADD COLUMN closed_by_source INTEGER NOT NULL DEFAULT 0 CHECK (closed_by_source IN (0, 1));
+    -- Existing dated rows: end of the deadline day Anywhere on Earth (UTC-12), i.e. 11:59:59 UTC
+    -- the next day. The next import recomputes this with the source's own time zone.
+    UPDATE scholarships SET closes_at = date(deadline_date, '+1 day') || 'T11:59:59+00:00'
+        WHERE deadline_kind = 'dated';
+    CREATE INDEX idx_scholarships_closes ON scholarships (closes_at);
+    """,
+))
+
 LATEST_VERSION = MIGRATIONS[-1][0]
 
 

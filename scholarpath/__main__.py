@@ -8,6 +8,7 @@ Commands
   backup          Copy a database with SQLite's backup API.
   migrate         Apply pending schema migrations (never deletes data).
   ai-check        Send one tiny request to the configured AI provider and report the result.
+  refresh         Scheduled refresh: collect live, validate, publish atomically (when 15 days are due).
 
 Real-data collection is always an explicit command; the Streamlit app never
 scrapes on startup or rerun.
@@ -16,6 +17,7 @@ scrapes on startup or rerun.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -122,6 +124,28 @@ def cmd_migrate(args) -> int:
     return 0
 
 
+def cmd_refresh(args) -> int:
+    """Run by the GitHub Actions workflow daily; does real work only when a refresh is due."""
+    from . import refresh
+
+    try:
+        result = refresh.run_refresh(force=args.force, dry_run=args.dry_run, source_ids=args.sources)
+    except refresh.RefreshLocked as exc:
+        print(f"SKIPPED: {exc}")
+        return 3
+    print(f"{result.outcome.upper()}: {result.message}")
+    for problem in result.problems:
+        print(f"  - {problem}")
+    if result.next_due_at:
+        print(f"Next refresh due: {result.next_due_at}")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:   # shown on the workflow run's page in GitHub
+        with open(summary, "a", encoding="utf-8") as fh:
+            fh.write(f"### Data refresh: {result.outcome}\n\n{result.message}\n\n")
+            fh.writelines(f"- {p}\n" for p in result.problems)
+    return result.exit_code
+
+
 def cmd_ai_check(_args) -> int:
     """Check the assistant's provider with one tiny request (uses about 100 tokens of the free quota)."""
     from . import advisor
@@ -167,6 +191,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("status", help="show databases and counts")
     p.set_defaults(func=cmd_status)
+
+    p = sub.add_parser("refresh", help="refresh the published real dataset when 15 days are due")
+    p.add_argument("--force", action="store_true", help="refresh now even if it is not due yet")
+    p.add_argument("--dry-run", action="store_true", help="collect and validate only; write nothing")
+    p.add_argument("--sources", nargs="+", choices=sorted(SOURCES), help="default: every enabled source")
+    p.set_defaults(func=cmd_refresh)
 
     p = sub.add_parser("ai-check", help="test the AI assistant's provider with one tiny request")
     p.set_defaults(func=cmd_ai_check)

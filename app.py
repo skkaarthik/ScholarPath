@@ -11,27 +11,31 @@ import os
 
 import streamlit as st
 
-from scholarpath import config
-from scholarpath.ui import (applications, common, data_sources, find, insights, profile_match, review, saved,
-                            style)
+from scholarpath import advisor, config
+from scholarpath.ui import (applications, chatbot, common, data_sources, find, insights, profile_match, review,
+                            saved, style)
 
 st.set_page_config(page_title="ScholarPath", page_icon=str(style.ASSETS / "icon.svg"), layout="wide")
 style.inject()
 common.keep_state()
 
 
-def _secrets_to_env() -> None:
-    """When hosted, the AI advisor's settings live in Streamlit secrets; the advisor reads them
-    from the environment. Locally there is usually no secrets file, and then nothing happens."""
+@st.cache_resource
+def _assistant_settings() -> bool:
+    """Load the assistant's settings once per server process: Streamlit secrets when hosted,
+    otherwise .env or .streamlit/secrets.toml. Without a key the assistant runs in demonstration mode."""
     try:
-        for name in ("SCHOLARPATH_AI_API_KEY", "SCHOLARPATH_AI_BASE_URL", "SCHOLARPATH_AI_MODEL"):
+        for name in advisor.SETTING_NAMES:
             if name in st.secrets and not os.environ.get(name):
                 os.environ[name] = str(st.secrets[name])
-    except Exception:  # no secrets.toml, or an unreadable one: run without the advisor
+    except Exception:  # no secrets.toml, or an unreadable one
         pass
+    advisor.load_local_settings()
+    advisor.reset_limiter()
+    return True
 
 
-_secrets_to_env()
+_assistant_settings()
 
 # The app follows one sequence: Find -> Review -> Apply -> Track.
 RENDERERS = {
@@ -96,4 +100,5 @@ with st.sidebar:
     st.caption("Runs only on this computer. ScholarPath never submits anything to a scholarship provider.")
 
 _menu(page)
+chatbot.entry(page)       # "Ask ScholarPath": the assistant panel, available on every page
 current.run()

@@ -106,29 +106,44 @@ a run with failed pages writes a separate `*.partial-*.json` file unless you pas
 missing from one run. **Live collection has not been verified from the development
 environment** (see [docs/SOURCES.md](docs/SOURCES.md)).
 
-## AI advisor (optional)
+## ScholarPath assistant (AI chat)
 
-The Review page can show an **Ask the AI advisor** section that answers questions about the
-scholarship on screen. It is off until an API key is set. Facts are taken only from the stored
-record; anything the record does not say is sent back to the official page.
+Every page has an **Ask ScholarPath** button (bottom right; a round button above the menu bar on
+phones). It opens a chat panel that helps with finding scholarships, eligibility, preparing an
+application and your application progress. On a Review page it talks about that scholarship.
 
-1. Create a free key at https://console.groq.com (default provider), or at
-   https://aistudio.google.com/apikey for Gemini.
-2. Set it, either as environment variables or in `.streamlit/secrets.toml` (git-ignored; on
-   Streamlit Community Cloud, paste the same lines into the app's *Secrets* setting):
+- Answers use only the records ScholarPath holds. The server picks the few records relevant to
+  each question; links and scholarship references in the answer are checked against those records
+  and anything else is removed or flagged. Each answer lists the scholarships it used, with
+  **Review** and **Official page** links.
+- Eligibility uses your **Check my fit** answers when you have filled them in, and separates what
+  you meet, what you don't, and what still needs verification.
+- Progress questions read the same entries as the Applications page (status and dates only, never
+  your notes). The app has no sign-in, so the assistant sees exactly what the app shows.
+- The assistant is read-only: it never saves, applies or changes anything.
+- **Without an API key** it runs in *demonstration mode*: plain answers built from the records,
+  clearly labelled, no AI.
 
-```toml
-SCHOLARPATH_AI_API_KEY = "your-key"
-# Optional - defaults shown. For Gemini use
-# https://generativelanguage.googleapis.com/v1beta/openai and a Gemini model name.
-SCHOLARPATH_AI_BASE_URL = "https://api.groq.com/openai/v1"
-SCHOLARPATH_AI_MODEL = "llama-3.3-70b-versatile"
-```
+### Setting up the AI provider (free)
 
-Free tiers are rate-limited and shared by everyone using the same key, so each visitor can ask
-15 questions per visit. Free models are renamed from time to time: if answers stop, set
-`SCHOLARPATH_AI_MODEL` to a model listed in the provider's console. Questions are sent to the
-provider, so do not type personal details.
+1. Create a free account at https://console.groq.com (no payment card) and create an API key.
+2. Copy `.env.example` to `.env` and paste the key into `SCHOLARPATH_AI_API_KEY`.
+   (Or put the same names in `.streamlit/secrets.toml`; on Streamlit Community Cloud use the app's
+   **Secrets** setting.) Both files are git-ignored.
+3. Test it: `python -m scholarpath ai-check` (one tiny request; prints OK or the reason it failed).
+4. Restart the app.
+
+Default provider: Groq, model `openai/gpt-oss-120b`. On Groq's free plan this model was listed at
+30 requests/minute, 1,000 requests/day, 8,000 tokens/minute and 200,000 tokens/day, per organisation
+(checked 19 Nov 2026; see the limits page in your Groq console for the current values). Groq says
+it does not retain inference inputs/outputs by default and does not train on them. Gemini also
+works (set `SCHOLARPATH_AI_BASE_URL` and `SCHOLARPATH_AI_MODEL`), but its free tier allows far fewer
+requests per day and Google may use free-tier content to improve its products.
+
+Limits built in: 800 characters per question, the last 4 exchanges as context, answers capped at
+700 tokens, 30 s timeout, 20 questions per visit, and a server-wide limit of 6 requests/minute and
+900/day (`SCHOLARPATH_AI_MAX_PER_MINUTE`, `SCHOLARPATH_AI_MAX_PER_DAY`). Conversations are not
+logged or stored. Questions are sent to the provider, so don't type personal details.
 
 ## Tests
 

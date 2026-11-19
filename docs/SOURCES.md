@@ -51,6 +51,26 @@ Only sources that are actually implemented are listed. Both are official bodies.
     **expired** on 2026-11-12. They are kept because the data is real; the app never shifts real
     deadlines.
 
+## 3. DAAD scholarship database (`daad`), disabled
+
+- Listing: https://www2.daad.de/deutschland/stipendium/datenbank/en/21148-scholarship-database/
+  (all programmes on one page; 147 on 19 Nov 2026, matching the page's own count).
+- robots.txt: none on www2.daad.de (HTTP 404, 19 Nov 2026), so no crawling restrictions.
+  DAAD's terms of use on www.daad.de could not be loaded that day and are not yet checked.
+- Programme pages publish **no application deadline** (it depends on the applicant's status and
+  country), so records have an unknown deadline. Country rules are "Only specified" and are
+  recorded as unknown with a manual-review note. Only the listing page is read.
+- Disabled (`ENABLED = False`) until the terms are checked and a live dry run succeeds; see
+  docs/DATA_REFRESH.md.
+
+## Live checks on 19 Nov 2026 (browser, not Python)
+
+Today's CSC and GREAT pages were read in a browser on the project owner's computer and parsed
+in a test environment: CSC 3/3 records (Master's and PhD 2027/28 "now closed"; Shared Scholarships
+close 16:00 GMT on 8 December 2026), GREAT 13/13 records (2026-27 cycle, 12 dated deadlines
+between April and August 2026, all passed; Trinity Laban has no date). No request was made from
+Python or from GitHub's servers.
+
 ## How the current real dataset was collected (2026-11-12)
 
 The development environment's network allow-list blocked both sites, so `--live` collection

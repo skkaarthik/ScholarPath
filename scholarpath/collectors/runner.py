@@ -20,13 +20,20 @@ from pathlib import Path
 
 from .. import config
 from ..cleaning import ValidationError, validate_record
-from . import cscuk, great
+from . import cscuk, daad, great
 from .base import LiveFetcher, SnapshotFetcher
 
+# Every configured source. Each module may set ENABLED = False to keep it out of default runs
+# (the scheduled refresh and `collect` without --sources) until it has been verified live.
 SOURCES = {
     cscuk.SOURCE_ID: cscuk,
     great.SOURCE_ID: great,
+    daad.SOURCE_ID: daad,
 }
+
+
+def enabled_source_ids() -> list[str]:
+    return [sid for sid, module in SOURCES.items() if getattr(module, "ENABLED", True)]
 
 
 class CollectionError(RuntimeError):

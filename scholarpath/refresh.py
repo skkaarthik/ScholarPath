@@ -224,7 +224,7 @@ def publish(records: list[dict], report: runner.CollectionReport, path: Path, no
 # --- the refresh -----------------------------------------------------------------------
 
 def enabled_sources() -> list[str]:
-    return [sid for sid, module in runner.SOURCES.items() if getattr(module, "ENABLED", True)]
+    return runner.enabled_source_ids()
 
 
 def run_refresh(now: datetime | None = None, force: bool = False, dry_run: bool = False,

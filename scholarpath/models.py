@@ -148,6 +148,10 @@ class ScholarshipRecord:
     dataset_origin: str
     notes: str = ""
     source_status: str = "available"
+    # When applications close (see dates.closes_at for the rules):
+    deadline_at: str | None = None          # exact closing instant (UTC ISO) when the source states a time
+    deadline_timezone: str | None = None    # IANA zone of the source, used for date-only deadlines
+    closed_by_source: bool = False          # the official page says applications are closed
 
     @property
     def manual_review_items(self) -> list[Requirement]:

@@ -15,6 +15,7 @@ import unicodedata
 from datetime import date, datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .models import (
     DATASET_ORIGINS,
@@ -227,6 +228,23 @@ def validate_record(raw: dict[str, Any]) -> ScholarshipRecord:
     if source_status not in SOURCE_STATUSES:
         errors.append(f"source_status: must be one of {SOURCE_STATUSES}")
 
+    deadline_at = normalise_utc_timestamp(raw.get("deadline_at"), "deadline_at", errors)
+    if deadline_at and deadline_kind != "dated":
+        errors.append("deadline_at: an exact closing time needs deadline_kind 'dated'")
+    if deadline_at and deadline_date and datetime.fromisoformat(deadline_at).date() not in (
+            deadline_date, date.fromordinal(deadline_date.toordinal() + 1),
+            date.fromordinal(deadline_date.toordinal() - 1)):
+        errors.append("deadline_at: does not match deadline_date")
+    deadline_timezone = clean_text(raw.get("deadline_timezone")) or None
+    if deadline_timezone:
+        try:
+            ZoneInfo(deadline_timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            errors.append(f"deadline_timezone: unknown IANA time zone {deadline_timezone!r}")
+    closed_by_source = raw.get("closed_by_source", False)
+    if not isinstance(closed_by_source, bool):
+        errors.append("closed_by_source: must be true or false")
+
     award_cycle = clean_text(raw.get("award_cycle")) or None
     eligibility_text = clean_text(raw.get("eligibility_text"))
     if not eligibility_text:
@@ -265,6 +283,9 @@ def validate_record(raw: dict[str, Any]) -> ScholarshipRecord:
         dataset_origin=dataset_origin,
         notes=clean_text(raw.get("notes")),
         source_status=source_status,
+        deadline_at=deadline_at,
+        deadline_timezone=deadline_timezone,
+        closed_by_source=bool(closed_by_source),
     )
 
 

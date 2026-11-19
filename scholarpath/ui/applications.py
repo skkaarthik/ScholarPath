@@ -168,7 +168,7 @@ def render(svc) -> None:
                            "and it appears here.", "Find scholarships", "find", icon=":material/search:")
         return
     today = svc.today()
-    records = {v.record.id: v for v in common.all_views(svc)}
+    records = {v.record.id: v for v in common.all_views(svc, include_closed=True)}   # tracked ones may be closed
     counts = Counter(a.status for a in apps)
     st.caption(common.plural(len(apps), "application") + ": "
                + ", ".join(f"{counts[s]} {common.tracker_status(s).lower()}" for s in TRACKER_STATUSES if counts[s]))

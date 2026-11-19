@@ -213,7 +213,7 @@ def _eligibility(rec) -> None:
 def _deadline_and_funding(view, today) -> None:
     rec = view.record
     st.header("Deadline", anchor=False)
-    st.markdown(f"**{describe_deadline(rec.deadline_kind, rec.deadline_date, today)}**")
+    st.markdown(f"**{describe_deadline(rec.deadline_kind, rec.deadline_date, today, view.status == 'expired')}**")
     if rec.deadline_text.strip():
         st.markdown(f"Provider's wording: “{common.md_escape(rec.deadline_text.strip())}”")
     if view.status == "unknown":

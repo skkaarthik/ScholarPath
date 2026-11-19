@@ -17,6 +17,7 @@ from streamlit.testing.v1 import AppTest
 
 from scholarpath import config
 from scholarpath.matching import StudentProfile
+from scholarpath.repository import SearchFilters
 from scholarpath.services import ScholarPathService
 
 from .conftest import FIXED_TODAY, by_key, real_record
@@ -109,7 +110,7 @@ def test_missing_database_shows_setup_steps_without_fallback():
 def test_app_opens_on_find_scholarships(seeded):
     at = run_app()
     assert [t.value for t in at.title] == ["Find scholarships"]
-    assert "Example data" in texts(at) and "15 scholarships" in texts(at)
+    assert "Example data" in texts(at) and "13 scholarships" in texts(at)
     assert not at.warning  # no alarming yellow banners on a normal page
 
 
@@ -154,7 +155,7 @@ def test_find_review_apply_track_flow(seeded, example_records):
     assert list(at.multiselect(key="f_hosts").value) == ["United Kingdom"]
     assert "In Applications: Applied" in texts(at)
     click(at, "clear_filters")
-    assert "15 scholarships" in texts(at)
+    assert "13 scholarships" in texts(at)
 
 
 def test_tracker_updates_status_confirms_and_rejects_invalid_combinations(seeded, example_records):
@@ -301,7 +302,7 @@ def test_profile_matching_rejects_score_without_scale(seeded):
 def test_blank_profile_is_never_a_match_and_suggests_what_to_add(seeded):
     at = goto(run_app(), "fit")
     submit_fit(at)
-    assert _tab_counts(at) == {"Good fits": 0, "Need more info": 15, "Not a fit": 0}
+    assert _tab_counts(at) == {"Good fits": 0, "Need more info": 13, "Not a fit": 0}
     body = texts(at)
     assert "Tip: add your citizenship, degree, score and subject" in body
     assert "Add your citizenship, degree and subject above to check the rest" in body
@@ -327,7 +328,7 @@ def test_switching_dataset_isolates_saved_items_and_clears_selection(seeded, exa
 
 def test_insights_states_scope_and_draws_charts(seeded):
     at = goto(run_app(), "insights")
-    assert "15 scholarships" in texts(at) and "no filters" in texts(at)
+    assert "13 scholarships" in texts(at) and "no filters" in texts(at)
     assert "counts once in each" in texts(at)
     assert len(at.get("vega_lite_chart")) == 3
 
@@ -359,11 +360,11 @@ def test_every_page_renders_without_errors(seeded):
 def test_results_are_paged_and_export_covers_every_page(seeded):
     at = run_app()
     first = card_ids(at)
-    assert len(first) == 10 and "Showing 1 to 10 of 15" in texts(at)
+    assert len(first) == 10 and "Showing 1 to 10 of 13" in texts(at)
     assert at.button(key="f_page_prev").disabled
     click(at, "f_page_next")
     second = card_ids(at)
-    assert len(second) == 5 and not set(first) & set(second)
+    assert len(second) == 3 and not set(first) & set(second)
     assert at.button(key="f_page_next").disabled
     at.multiselect(key="f_hosts").set_value(["United Kingdom"]).run()  # filtering returns to page 1
     assert at.session_state["f_page"] == 1
@@ -386,14 +387,14 @@ def test_no_matches_explains_why_and_offers_recovery(seeded):
     at.text_input(key="f_text").input("zzz-no-such-scholarship").run()
     assert "0 scholarships" in texts(at) and "No scholarships match" in texts(at)
     click(at, "clear_filters_empty")
-    assert "15 scholarships" in texts(at)
+    assert "13 scholarships" in texts(at)
 
 
 def test_review_without_a_selection_points_back_to_find(seeded):
     at = goto(run_app(), "review")
     assert "No scholarship selected" in texts(at)
     click(at, "empty_review_go")
-    assert "15 scholarships" in texts(at)
+    assert "13 scholarships" in texts(at)
 
 
 def test_data_page_reports_sources_and_honest_freshness(seeded):
@@ -484,11 +485,11 @@ def test_sort_and_page_are_restored_after_review(seeded):
     at.selectbox(key="f_sort").set_value("name").run()
     click(at, "f_page_next")
     shown = card_ids(at)
-    assert at.session_state["f_page"] == 2 and len(shown) == 5
+    assert at.session_state["f_page"] == 2 and len(shown) == 3
     click(at, f"find_rev_{shown[0]}")
     click(at, "r_back")
     assert at.selectbox(key="f_sort").value == "name" and at.session_state["f_page"] == 2
-    assert card_ids(at) == shown and "Showing 11 to 15 of 15" in texts(at)
+    assert card_ids(at) == shown and "Showing 11 to 13 of 13" in texts(at)
 
 
 def test_changing_search_filter_or_sort_on_a_later_page_returns_to_page_one(seeded):
@@ -513,7 +514,7 @@ def test_clearing_filters_is_sent_to_the_browser_not_only_forgotten_by_the_serve
     at.multiselect(key="f_hosts").set_value(["Canada"]).run()
     assert "2 scholarships" in texts(at)
     click(at, "clear_filters")
-    assert "15 scholarships" in texts(at) and "Filtered by" not in texts(at)
+    assert "13 scholarships" in texts(at) and "Filtered by" not in texts(at)
     assert at.text_input(key="f_text").value == "" and at.text_input(key="f_text").proto.set_value
     assert list(at.multiselect(key="f_hosts").value) == [] and at.multiselect(key="f_hosts").proto.set_value
 
@@ -527,7 +528,7 @@ def test_download_button_covers_all_filtered_results_not_only_the_page(seeded):
     at = run_app()
     assert len(card_ids(at)) == 10  # page 1 of 2
     labels = [b.proto.label for b in at.get("download_button")]
-    assert labels == ["Download 15 results as CSV"]
+    assert labels == ["Download 13 results as CSV"]
     at.multiselect(key="f_hosts").set_value(["United Kingdom"]).run()
     assert [b.proto.label for b in at.get("download_button")] == ["Download 2 results as CSV"]
 
@@ -536,7 +537,8 @@ def test_deadline_states_are_told_apart(seeded, example_records):
     """Closing soon, open, closed, rolling, 'date not confirmed' and 'nothing published' never share a label."""
     from scholarpath.ui import common
 
-    labels = {v.record.source_key: common.deadline_state(v)[1] for v in seeded.search()}
+    labels = {v.record.source_key: common.deadline_state(v)[1]
+              for v in seeded.search(SearchFilters(include_closed=True))}
     assert labels["aurora-global-masters-southgate"] == "Closes today"
     assert labels["cedar-public-health"] == "Closes in 3 days"
     assert labels["lakeshore-stem-excellence"] == "Open"
@@ -733,15 +735,19 @@ def test_insight_counts_match_the_stored_data(seeded):
 
     from scholarpath.ui import insights
 
-    views = seeded.search()
+    views = seeded.search()          # Insights counts open opportunities, like every other count
+    is_open = "(closed_by_source = 0 AND (closes_at IS NULL OR closes_at > :now))"
+    now = {"now": seeded.now_iso()}
     with sqlite3.connect(seeded.db_path) as conn:
-        hosts = dict(conn.execute("SELECT country, COUNT(*) FROM scholarship_host_countries GROUP BY country"))
-        funding = [n for (n,) in conn.execute("SELECT COUNT(*) FROM scholarships GROUP BY funding_category")]
+        hosts = dict(conn.execute("SELECT country, COUNT(*) FROM scholarship_host_countries h JOIN scholarships s "
+                                  f"ON s.id = h.scholarship_id WHERE {is_open} GROUP BY country", now))
+        funding = [n for (n,) in conn.execute(f"SELECT COUNT(*) FROM scholarships WHERE {is_open} "
+                                              "GROUP BY funding_category", now)]
         months = conn.execute("SELECT substr(deadline_date, 1, 7), COUNT(*) FROM scholarships "
-                              "WHERE deadline_kind = 'dated' GROUP BY 1 ORDER BY 1").fetchall()
+                              f"WHERE deadline_kind = 'dated' AND {is_open} GROUP BY 1 ORDER BY 1", now).fetchall()
     assert dict(insights.count_by_country(views)) == hosts
     assert sorted(insights.count_by_funding(views).values()) == sorted(funding)
-    assert sum(insights.count_by_funding(views).values()) == len(views) == 15
+    assert sum(insights.count_by_funding(views).values()) == len(views) == 13
     by_month = insights.count_by_month(views)
     assert [count for _, count in by_month] == [count for _, count in months]  # same order: oldest month first
     assert [label for label, _ in by_month] == [date.fromisoformat(m + "-01").strftime("%b %Y") for m, _ in months]

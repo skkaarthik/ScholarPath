@@ -34,8 +34,11 @@ def test_unknown_subject_never_satisfies_a_subject_filter_but_unrestricted_does(
 
 
 def test_degree_filter_matches_any_selected_degree(example_service):
-    found = names(example_service.search(SearchFilters(degrees=["bachelor", "non_degree"])))
+    found = names(example_service.search(SearchFilters(degrees=["bachelor", "non_degree"], include_closed=True)))
     assert found == {"Orion Undergraduate Access Award", "Atlas Open Short-Course Grant"}
+    # Orion closed on 2 Nov, so discovery shows only the open one
+    assert names(example_service.search(SearchFilters(degrees=["bachelor", "non_degree"]))) == {
+        "Atlas Open Short-Course Grant"}
 
 
 def test_text_search_matches_name_or_provider_and_escapes_wildcards(example_service):
@@ -46,8 +49,9 @@ def test_text_search_matches_name_or_provider_and_escapes_wildcards(example_serv
 
 
 def test_deadline_status_filter_keeps_statuses_distinct(example_service):
-    expired = names(example_service.search(SearchFilters(deadline_statuses=["expired"])))
+    expired = names(example_service.search(SearchFilters(deadline_statuses=["expired"], include_closed=True)))
     assert expired == {"Orion Undergraduate Access Award", "Coral Education Leaders Fellowship"}
+    assert example_service.search(SearchFilters(deadline_statuses=["expired"])) == []   # never in discovery
     rolling = names(example_service.search(SearchFilters(deadline_statuses=["rolling"])))
     assert rolling == {"Harbourview Business Leaders Grant", "Atlas Open Short-Course Grant"}
     unknown = names(example_service.search(SearchFilters(deadline_statuses=["unknown"])))
@@ -57,11 +61,12 @@ def test_deadline_status_filter_keeps_statuses_distinct(example_service):
 
 def test_clearing_filters_returns_everything(example_service):
     assert SearchFilters().is_empty()
-    assert len(example_service.search(SearchFilters())) == 15
+    assert len(example_service.search(SearchFilters())) == 13          # every open opportunity
+    assert len(example_service.search(SearchFilters(include_closed=True))) == 15
 
 
 def test_deadline_sort_order_open_then_rolling_then_unknown_then_expired(example_service):
-    views = example_service.search(sort="deadline")
+    views = example_service.search(SearchFilters(include_closed=True), sort="deadline")
     statuses = [v.status for v in views]
     assert statuses == sorted(statuses, key=["open", "rolling", "unknown", "expired"].index)
     open_dates = [v.record.deadline_date for v in views if v.status == "open"]

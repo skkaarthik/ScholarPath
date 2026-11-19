@@ -1,11 +1,12 @@
 """Phase 2: service + SQLite integration (imports, persistence, isolation, rollback, migrations)."""
 
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from scholarpath import config, repository
+from scholarpath.repository import SearchFilters
 from scholarpath.database import LATEST_VERSION, connect, migrate, schema_version
 from scholarpath.services import ImportFailed, ScholarPathService, ServiceError
 
@@ -18,8 +19,9 @@ def reopen(service: ScholarPathService) -> ScholarPathService:
 
 
 def test_import_and_retrieve_through_the_service_used_by_the_ui(example_service, example_records):
-    views = example_service.search()
+    views = example_service.search(SearchFilters(include_closed=True))
     assert len(views) == 15
+    assert len(example_service.search()) == 13          # discovery leaves out the 2 closed records
     rec = example_service.get(by_key(example_records, "lakeshore-stem-excellence")["id"]).record
     assert rec.nationalities.values == ["Bangladesh", "India", "Nepal", "Sri Lanka"]
     assert rec.subjects.values == ["computer_science", "engineering", "natural_sciences"]
@@ -131,7 +133,7 @@ def test_failed_batch_rolls_back_completely(example_service, example_records, mo
         example_service.import_records(example_records + [new])
     monkeypatch.undo()
 
-    views = example_service.search()
+    views = example_service.search(SearchFilters(include_closed=True))
     assert len(views) == 15
     assert not any(v.record.notes.endswith("Revised.") for v in views)
     with connect(example_service.db_path) as conn:
@@ -142,7 +144,7 @@ def test_failed_batch_rolls_back_completely(example_service, example_records, mo
 def test_invalid_records_are_rejected_before_any_write(example_service):
     with pytest.raises(ImportFailed, match="No valid records"):
         example_service.import_records([{"name": "no fields"}])
-    assert len(example_service.search()) == 15
+    assert len(example_service.search(SearchFilters(include_closed=True))) == 15
 
 
 def test_multi_step_tracker_write_rolls_back_on_error(example_service, example_records, monkeypatch):
@@ -174,7 +176,8 @@ def test_example_and_real_modes_are_isolated(tmp_path, clock, example_records):
     assert real.saved_ids() == []
     with pytest.raises(ServiceError):
         real.save(example_records[0]["id"])
-    assert len(example.search()) == 15 and len(real.search()) == 1
+    everything = SearchFilters(include_closed=True)
+    assert len(example.search(everything)) == 15 and len(real.search(everything)) == 1
     assert example.overview()["saved"] == 1 and real.overview()["saved"] == 0
 
 
@@ -195,8 +198,13 @@ def test_migration_from_v1_preserves_user_data(tmp_path, clock, example_records)
     from scholarpath.cleaning import content_hash, validate_record
 
     rec = validate_record(example_records[0])
-    with connect(path) as conn:
-        repository.insert_scholarship(conn, rec, content_hash(rec), "2026-01-01T00:00:00+00:00")
+    with connect(path) as conn:   # a version-1 row, written with version-1 columns only
+        params = repository._scholarship_params(rec, content_hash(rec), "2026-01-01T00:00:00+00:00")
+        columns = [r["name"] for r in conn.execute("PRAGMA table_info(scholarships)")]
+        values = {c: params.get(c, params["now"]) for c in columns}
+        conn.execute(f"INSERT INTO scholarships ({', '.join(columns)}) VALUES "
+                     f"({', '.join(':' + c for c in columns)})", values)
+        repository.replace_children(conn, rec)
         conn.execute("INSERT INTO shortlist VALUES (?, '2026-01-02T00:00:00+00:00')", (rec.id,))
         conn.execute("INSERT INTO applications (scholarship_id, status, notes, created_at, updated_at) "
                      "VALUES (?, 'preparing', 'my notes', '2026-01-02T00:00:00+00:00', '2026-01-03T00:00:00+00:00')",
@@ -210,6 +218,10 @@ def test_migration_from_v1_preserves_user_data(tmp_path, clock, example_records)
     history = service.application_history(rec.id)
     assert len(history) == 1 and history[0]["status"] == "preparing"
     assert service.ensure_schema() == LATEST_VERSION  # re-running is a no-op
+    with connect(path) as conn:   # v3 gave the old dated row a closing instant (end of day, AoE)
+        row = conn.execute("SELECT deadline_date, closes_at, closed_by_source FROM scholarships").fetchone()
+    assert row["closes_at"].startswith(str(date.fromisoformat(row["deadline_date"]) + timedelta(days=1)))
+    assert row["closes_at"].endswith("T11:59:59+00:00") and row["closed_by_source"] == 0
 
 
 def test_unavailable_pages_are_flagged_not_deleted(tmp_path, clock):

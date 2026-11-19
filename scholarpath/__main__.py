@@ -7,6 +7,7 @@ Commands
   status          Show database locations, schema versions and counts.
   backup          Copy a database with SQLite's backup API.
   migrate         Apply pending schema migrations (never deletes data).
+  ai-check        Send one tiny request to the configured AI provider and report the result.
 
 Real-data collection is always an explicit command; the Streamlit app never
 scrapes on startup or rerun.
@@ -121,6 +122,28 @@ def cmd_migrate(args) -> int:
     return 0
 
 
+def cmd_ai_check(_args) -> int:
+    """Check the assistant's provider with one tiny request (uses about 100 tokens of the free quota)."""
+    from . import advisor
+
+    advisor.load_local_settings()
+    settings = advisor.settings_from_env()
+    if settings is None:
+        print("No API key found. Set SCHOLARPATH_AI_API_KEY in .env or .streamlit/secrets.toml "
+              "(see .env.example). The assistant will run in demonstration mode.")
+        return 2
+    print(f"Provider: {advisor.provider_name(settings)} ({settings.base_url})\nModel:    {settings.model}")
+    messages = [{"role": "system", "content": "Reply with exactly: ScholarPath assistant is working."},
+                {"role": "user", "content": "Status check."}]
+    try:
+        answer = advisor.call_provider(settings, messages, limiter=advisor.RateLimiter(1, 1))
+    except advisor.AdvisorError as exc:
+        print(f"FAILED: {exc}")
+        return 1
+    print(f"OK - the provider answered: {answer[:200]}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m scholarpath", description="ScholarPath data commands")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -144,6 +167,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("status", help="show databases and counts")
     p.set_defaults(func=cmd_status)
+
+    p = sub.add_parser("ai-check", help="test the AI assistant's provider with one tiny request")
+    p.set_defaults(func=cmd_ai_check)
 
     for name, func, help_text in (("backup", cmd_backup, "back up a database"),
                                   ("migrate", cmd_migrate, "apply schema migrations")):

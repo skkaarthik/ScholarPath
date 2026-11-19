@@ -362,6 +362,19 @@ class ScholarPathService:
             row = repo.application_for(conn, scholarship_id)
         return _to_application(row)
 
+    def remove_application(self, scholarship_id: str) -> bool:
+        """Remove the tracker entry for a scholarship, with its history, in one transaction.
+
+        Only the user's own tracking is deleted: the scholarship record and the Saved
+        list are untouched. Returns False when there was no entry (e.g. a repeated click).
+        """
+        with connect(self.db_path) as conn, transaction(conn):
+            row = repo.application_for(conn, scholarship_id)
+            if row is None:
+                return False
+            repo.application_delete(conn, row["id"])
+        return True
+
     def get_application(self, scholarship_id: str) -> Application | None:
         with connect(self.db_path) as conn:
             row = repo.application_for(conn, scholarship_id)

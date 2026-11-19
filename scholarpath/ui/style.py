@@ -129,27 +129,133 @@ h1, h2, h3 { overflow-wrap: anywhere; }             /* very long titles wrap ins
 }
 
 /* --- Assistant ---------------------------------------------------------------------
-   "chat_fab" is the Ask ScholarPath button (ui/chatbot.py), pinned to the bottom-right corner;
-   on phones it sits above the menu bar. The panel itself is Streamlit's dialog. */
-.st-key-chat_fab { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 99; width: auto !important; }
+   ui/chatbot.py. "chat_fab" is the Ask ScholarPath button; "chat_panel" the chat window that
+   replaces it in the bottom-right corner (a sheet above the menu bar on phones). Colours and
+   hover follow the menu: idle ink-2, hover 8 % indigo tint with indigo text, highlight lavender. */
+.st-key-chat_fab { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 101; width: auto !important; }
 .st-key-chat_fab button {
   min-height: 3rem; padding: 0 1.125rem; border-radius: 999px; border: 1px solid var(--sp-primary);
   background: var(--sp-primary); color: #FFFFFF; box-shadow: 0 4px 14px rgba(52, 58, 140, 0.28);
-  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 .st-key-chat_fab button * { color: #FFFFFF !important; }
-@media (hover: hover) { .st-key-chat_fab button:hover { background: #2A2F75; border-color: #2A2F75; } }
+@media (hover: hover) {
+  .st-key-chat_fab button:hover {
+    background: #2A2F75; border-color: #2A2F75; box-shadow: 0 6px 18px rgba(52, 58, 140, 0.36); transform: translateY(-1px);
+  }
+}
+
+/* The window. */
+.st-key-chat_panel {
+  position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 101;
+  width: min(25rem, calc(100vw - 3rem)) !important; max-height: min(42rem, calc(100vh - 3rem));
+  gap: 0 !important; overflow: hidden;
+  background: var(--sp-paper); border: 1px solid var(--sp-line); border-radius: 1rem;
+  box-shadow: 0 16px 40px rgba(18, 17, 24, 0.16), 0 2px 6px rgba(18, 17, 24, 0.06);
+}
+.st-key-chat_panel > * { flex-shrink: 0; }
+/* Streamlit pulls every text block up by 1rem (a negative bottom margin); inside the compact
+   window that makes lines overlap, so text blocks keep their natural height here. */
+.st-key-chat_panel div:has(> p) { margin-bottom: 0 !important; }
+.st-key-chat_status { padding: 0.5rem 1rem 0; }
+.st-key-chat_status p { margin: 0; font-size: 0.8125rem; }
+
+/* Header: icon tile, title and context, Clear and Close as round icon buttons. */
+.st-key-chat_head {
+  padding: 0.75rem 0.75rem 0.75rem 1rem; background: var(--sp-sheet); border-bottom: 1px solid var(--sp-line);
+}
+.st-key-chat_icon {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 2.5rem !important; height: 2.5rem; border-radius: 0.75rem; background: var(--sp-tint);
+}
+.st-key-chat_icon p { margin: 0; color: var(--sp-primary); font-size: 1.25rem; line-height: 1; }
+.st-key-chat_title { flex: 1 1 auto; min-width: 0; }
+.st-key-chat_title p { margin: 0; line-height: 1.3; }
+.st-key-chat_title { gap: 0.125rem; }
+.st-key-chat_title > :last-child p {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sp-ink-2); font-size: 0.8125rem;
+}
+:is(.st-key-chat_clear, .st-key-chat_close) { width: auto !important; }
+:is(.st-key-chat_clear, .st-key-chat_close) button {
+  width: 2.5rem; min-width: 2.5rem; min-height: 2.5rem; padding: 0; justify-content: center;
+  border-radius: 0.75rem; color: var(--sp-ink-2); transition: background-color 0.15s ease, color 0.15s ease;
+}
+:is(.st-key-chat_clear, .st-key-chat_close, .st-key-chat_fab) button p {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.st-key-chat_fab button p { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+
+/* Messages: scroll inside the window, newest at the bottom (column-reverse keeps it in view). */
+.st-key-chat_msgs {
+  display: flex; flex-direction: column-reverse; justify-content: flex-start !important;
+  overflow-y: auto; overscroll-behavior: contain;
+  flex: 1 1 auto !important; min-height: 8rem; max-height: 26rem; padding: 0.75rem 1rem;
+}
+.st-key-chat_msgs > * { flex-shrink: 0; }                 /* the content scrolls instead of shrinking */
+.st-key-chat_msgs_inner { gap: 0.625rem; }
+[class*="st-key-chat_user_"], [class*="st-key-chat_bot_"] { padding: 0.5rem 0.875rem; gap: 0.25rem; }
+[class*="st-key-chat_user_"] p, [class*="st-key-chat_bot_"] p, [class*="st-key-chat_bot_"] li { font-size: 0.9375rem; }
+[class*="st-key-chat_user_"] p:last-child, [class*="st-key-chat_bot_"] p:last-child { margin-bottom: 0; }
+/* The student's messages: lavender bubbles on the right. */
+[class*="st-key-chat_user_"] {
+  width: fit-content !important; max-width: 85%; margin-left: auto;
+  background: var(--sp-tint); color: #121118; border-radius: 1rem 1rem 0.25rem 1rem;
+}
+/* The assistant's answers: white sheets on the left, like the site's cards. */
+[class*="st-key-chat_bot_"] {
+  max-width: 94%; margin-right: auto; background: var(--sp-sheet);
+  border: 1px solid var(--sp-line); border-radius: 1rem 1rem 1rem 0.25rem; box-shadow: var(--sp-shadow);
+}
+.st-key-chat_thinking { padding: 0.25rem 0.25rem; color: var(--sp-ink-2); }
+
+/* Starter questions: outlined chips that take the menu's hover. */
+.st-key-chat_starters button {
+  justify-content: flex-start; text-align: left; min-height: 2.5rem; padding: 0.5rem 0.875rem;
+  background: var(--sp-sheet); border: 1px solid var(--sp-line); border-radius: 0.75rem; color: var(--sp-ink-2);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.st-key-chat_starters button > div { justify-content: flex-start; }
+/* Links under an answer: indigo, compact. */
+[class*="st-key-chat_ref_"] { flex-wrap: wrap; row-gap: 0; }
+[class*="st-key-chat_ref_"] button, [class*="st-key-chat_ref_"] a {
+  min-height: 2.25rem; padding: 0 0.5rem; border-radius: 0.5rem; color: var(--sp-primary) !important;
+  transition: background-color 0.15s ease;
+}
+[class*="st-key-chat_ref_"] :is(button, a) p { font-size: 0.875rem; font-weight: 600; text-align: left; }
+
+@media (hover: hover) {
+  :is(.st-key-chat_clear, .st-key-chat_close, .st-key-chat_starters, [class*="st-key-chat_ref_"]) :is(button, a):hover {
+    background-color: rgba(52, 58, 140, 0.08) !important; color: var(--sp-primary) !important;
+  }
+  .st-key-chat_starters button:hover { border-color: var(--sp-tint-strong); }
+  .st-key-chat_starters button:hover * { color: var(--sp-primary) !important; }
+}
+
+/* Question field and Send. */
+.st-key-chat_foot {
+  padding: 0.75rem 1rem 1rem; background: var(--sp-sheet); border-top: 1px solid var(--sp-line);
+}
+.st-key-chat_input_row { flex-wrap: nowrap !important; }
+.st-key-chat_input_row > :first-child { flex: 1 1 0; width: auto !important; min-width: 0; }
+.st-key-chat_input_row > :last-child { flex: 0 0 auto; width: auto !important; }
+.st-key-chat_input_row button { min-height: 2.5rem; border-radius: 0.75rem; }
+/* Streamlit's "Press Enter to submit form" hint sits right after the field's box and covers the
+   text in this narrow field; the Send button next to it already says what to do. */
+.st-key-chat_input_row div:has(> div > input) + div { display: none; }
+
+/* Phones: a sheet above the menu bar, the full width of the screen. */
 @media (max-width: 40rem) {
-  /* A round icon button on phones, so it covers less of the page. The label stays readable
-     by screen readers (visually hidden, not display:none). */
   .st-key-chat_fab { right: 0.75rem; bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px)); }
   .st-key-chat_fab button { width: 3.25rem; min-height: 3.25rem; padding: 0; justify-content: center; }
   .st-key-chat_fab button p {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
   }
+  .st-key-chat_panel {
+    left: 0.5rem; right: 0.5rem; width: auto !important;
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 6.5rem);
+  }
+  .st-key-chat_msgs { max-height: 52vh; }
 }
-.st-key-chat_head { padding-bottom: 0.5rem; border-bottom: 1px solid var(--sp-line); }
-.st-key-chat_starters button, .st-key-chat_starters button > div { justify-content: flex-start; text-align: left; }
 
 /* --- Focus and motion --------------------------------------------------------------- */
 /* One clear keyboard-focus ring everywhere (WCAG 2.4.7 / 2.4.11). */

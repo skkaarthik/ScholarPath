@@ -11,23 +11,26 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Iterable
 
+from .dates import closes_at_iso
 from .models import Exclusions, Requirement, Restriction, ScholarshipRecord
 
-# Deadline status computed in SQL so filters and sorting agree with dates.py.
+# Closed = the source says so, or the stored closing instant (dates.closes_at) has passed.
+# ``:now`` is a UTC ISO timestamp; ``closes_at`` is stored in the same format, so the text
+# comparison is a time comparison. Filters, sorting, counts and dates.py all agree.
+CLOSED_SQL = "(s.closed_by_source = 1 OR (s.closes_at IS NOT NULL AND s.closes_at <= :now))"
 STATUS_SQL = (
-    "CASE WHEN s.deadline_kind = 'rolling' THEN 'rolling' "
-    "WHEN s.deadline_kind = 'unknown' THEN 'unknown' "
-    "WHEN s.deadline_date >= :today THEN 'open' ELSE 'expired' END"
+    f"CASE WHEN {CLOSED_SQL} THEN 'expired' "
+    "WHEN s.deadline_kind = 'rolling' THEN 'rolling' "
+    "WHEN s.deadline_kind = 'unknown' THEN 'unknown' ELSE 'open' END"
 )
 
 # Deadline sort order (documented in docs/ARCHITECTURE.md): open dated deadlines
 # soonest first, then rolling, then unknown, then expired (most recent first).
 SORTS = {
     "deadline": (
-        "CASE WHEN s.deadline_kind = 'dated' AND s.deadline_date >= :today THEN 0 "
-        "WHEN s.deadline_kind = 'rolling' THEN 1 "
-        "WHEN s.deadline_kind = 'unknown' THEN 2 ELSE 3 END, "
-        "CASE WHEN s.deadline_date >= :today THEN s.deadline_date END ASC, "
+        f"CASE WHEN {CLOSED_SQL} THEN 3 WHEN s.deadline_kind = 'dated' THEN 0 "
+        "WHEN s.deadline_kind = 'rolling' THEN 1 ELSE 2 END, "
+        f"CASE WHEN NOT {CLOSED_SQL} THEN s.closes_at END ASC, "
         "s.deadline_date DESC, s.name COLLATE NOCASE, s.id"
     ),
     "name": "s.name COLLATE NOCASE, s.provider COLLATE NOCASE, s.id",
@@ -43,6 +46,9 @@ class SearchFilters:
     subjects: list[str] = field(default_factory=list)
     funding: list[str] = field(default_factory=list)
     deadline_statuses: list[str] = field(default_factory=list)
+    # Active discovery never shows closed opportunities. Only pages that must reach closed
+    # records on purpose (Data & sources, a saved/tracked record's own page) set this.
+    include_closed: bool = False
 
     def is_empty(self) -> bool:
         return not (self.text.strip() or self.host_countries or self.degrees or self.subjects
@@ -99,6 +105,8 @@ def _scholarship_params(rec: ScholarshipRecord, content_hash: str, now: str) -> 
         "collected_at": rec.collected_at, "source_fetched_at": rec.source_fetched_at,
         "fetch_method": rec.fetch_method, "manual_verified_at": rec.manual_verified_at,
         "dataset_origin": rec.dataset_origin, "notes": rec.notes, "source_status": rec.source_status,
+        "deadline_at": rec.deadline_at, "deadline_timezone": rec.deadline_timezone,
+        "closes_at": closes_at_iso(rec), "closed_by_source": int(rec.closed_by_source),
         "content_hash": content_hash, "now": now,
     }
 
@@ -112,6 +120,7 @@ def insert_scholarship(conn: sqlite3.Connection, rec: ScholarshipRecord, content
             deadline_date, deadline_text, eligibility_text, application_url, source_url,
             source_name, source_key, award_cycle, collected_at, source_fetched_at, fetch_method,
             manual_verified_at, dataset_origin, notes, source_status, content_hash,
+            deadline_at, deadline_timezone, closes_at, closed_by_source,
             first_imported_at, last_imported_at
         ) VALUES (
             :id, :name, :provider, :degree_kind, :subject_kind, :nationality_kind, :exclusion_kind,
@@ -119,6 +128,7 @@ def insert_scholarship(conn: sqlite3.Connection, rec: ScholarshipRecord, content
             :deadline_date, :deadline_text, :eligibility_text, :application_url, :source_url,
             :source_name, :source_key, :award_cycle, :collected_at, :source_fetched_at, :fetch_method,
             :manual_verified_at, :dataset_origin, :notes, :source_status, :content_hash,
+            :deadline_at, :deadline_timezone, :closes_at, :closed_by_source,
             :now, :now
         )
         """,
@@ -147,6 +157,8 @@ def update_scholarship(conn: sqlite3.Connection, rec: ScholarshipRecord, content
             source_fetched_at = :source_fetched_at, fetch_method = :fetch_method,
             manual_verified_at = COALESCE(:manual_verified_at, manual_verified_at),
             notes = :notes, source_status = :source_status, content_hash = :content_hash,
+            deadline_at = :deadline_at, deadline_timezone = :deadline_timezone,
+            closes_at = :closes_at, closed_by_source = :closed_by_source,
             last_imported_at = :now
         WHERE id = :id
         """,
@@ -212,14 +224,15 @@ def latest_import_run(conn: sqlite3.Connection) -> sqlite3.Row | None:
 
 # --- scholarship reads --------------------------------------------------------
 
-def search_ids(conn: sqlite3.Connection, filters: SearchFilters, today: date, sort: str = "deadline") -> list[str]:
+def search_ids(conn: sqlite3.Connection, filters: SearchFilters, today: date, sort: str = "deadline",
+               now: str | None = None) -> list[str]:
     """Combined filters: OR within a category, AND across categories.
 
     Unknown criteria never satisfy a precise filter; explicitly unrestricted
     degree/subject criteria do.
     """
-    params: dict = {"today": today.isoformat()}
-    where = ["1 = 1"]
+    params: dict = {"today": today.isoformat(), "now": now or f"{today.isoformat()}T12:00:00+00:00"}
+    where = ["1 = 1"] if filters.include_closed else [f"NOT {CLOSED_SQL}"]
     if filters.text.strip():
         params["text"] = f"%{_escape_like(filters.text.strip())}%"
         where.append("(s.name LIKE :text ESCAPE '\\' OR s.provider LIKE :text ESCAPE '\\')")
@@ -288,12 +301,19 @@ def load_records(conn: sqlite3.Connection, ids: list[str]) -> list[ScholarshipRe
             collected_at=row["collected_at"], source_fetched_at=row["source_fetched_at"],
             fetch_method=row["fetch_method"], manual_verified_at=row["manual_verified_at"],
             dataset_origin=row["dataset_origin"], notes=row["notes"], source_status=row["source_status"],
+            deadline_at=row["deadline_at"], deadline_timezone=row["deadline_timezone"],
+            closed_by_source=bool(row["closed_by_source"]),
         ))
     return records
 
 
 def count_scholarships(conn: sqlite3.Connection) -> int:
     return int(conn.execute("SELECT COUNT(*) FROM scholarships").fetchone()[0])
+
+
+def count_active(conn: sqlite3.Connection, now: str) -> int:
+    """Opportunities shown in discovery: not closed (rolling and unknown deadlines count)."""
+    return int(conn.execute(f"SELECT COUNT(*) FROM scholarships s WHERE NOT {CLOSED_SQL}", {"now": now}).fetchone()[0])
 
 
 def distinct_values(conn: sqlite3.Connection) -> dict[str, list[str]]:

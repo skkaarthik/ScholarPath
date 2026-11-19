@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import date
+from datetime import date, datetime
 
-from .dates import STATUS_LABELS, deadline_status
+from .dates import STATUS_LABELS, deadline_status, record_closed
 from .models import DEGREES, FUNDING_CATEGORIES, SCORE_SCALES, SUBJECTS, ScholarshipRecord
 
 FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -45,8 +45,9 @@ def _restriction_text(kind: str, values: list[str], labels: dict | None = None) 
     return "; ".join(labels.get(v, v) if labels else v for v in values)
 
 
-def record_row(rec: ScholarshipRecord, today: date) -> dict:
-    status, days_left = deadline_status(rec.deadline_kind, rec.deadline_date, today)
+def record_row(rec: ScholarshipRecord, today: date, now: datetime | None = None) -> dict:
+    closed = record_closed(rec, now) if now is not None else None
+    status, days_left = deadline_status(rec.deadline_kind, rec.deadline_date, today, closed)
     exc = rec.nationality_exclusions
     exclusions = {"none": "None recorded", "unknown": "Unknown"}.get(exc.kind, "; ".join(exc.values))
     score = (f"{rec.min_score:g} ({SCORE_SCALES[rec.score_scale]['label']})" if rec.min_score is not None else "")
@@ -81,11 +82,12 @@ def record_row(rec: ScholarshipRecord, today: date) -> dict:
     }
 
 
-def to_csv(records: list[ScholarshipRecord], today: date) -> str:
+def to_csv(records: list[ScholarshipRecord], today: date, now: datetime | None = None) -> str:
+    """CSV of the given records. Pass ``now`` so the status uses the same closing rule as the app."""
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=COLUMNS, lineterminator="\n")
     writer.writeheader()
     for rec in records:
-        row = record_row(rec, today)
+        row = record_row(rec, today, now)
         writer.writerow({k: safe_cell(v) if isinstance(v, str) else v for k, v in row.items()})
     return buffer.getvalue()

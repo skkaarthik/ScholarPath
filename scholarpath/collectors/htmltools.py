@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from bs4 import BeautifulSoup, Tag
 
@@ -50,6 +50,34 @@ def parse_full_date(text: str) -> date | None:
         return None
     day, month, year = match.groups()
     return datetime.strptime(f"{day} {month} {year}", "%d %B %Y").date()
+
+
+# Zone abbreviations that official UK and German pages use next to a closing time.
+ZONE_OFFSETS = {"GMT": 0, "UTC": 0, "BST": 1, "CET": 1, "CEST": 2}
+CLOCK_TIME = re.compile(r"\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\s*\(?(GMT|UTC|BST|CET|CEST)\b\)?", re.I)
+
+
+def parse_closing_time(text: str, day: date | None) -> str | None:
+    """'16:00 GMT on Tuesday 8 December 2026' -> '2026-12-08T16:00:00+00:00' (UTC).
+
+    Only when the same sentence gives a full date (``day``), a clock time and an explicit
+    zone; anything less returns None and the date-only rule applies instead."""
+    if day is None:
+        return None
+    match = CLOCK_TIME.search(text)
+    if not match:
+        return None
+    if match[2] is None and match[3] is None:
+        return None   # a bare number next to a zone ("2026 GMT") is not a time
+    hour, minute, meridiem, zone = int(match[1]), int(match[2] or 0), (match[3] or "").lower(), match[4].upper()
+    if meridiem == "pm" and hour < 12:
+        hour += 12
+    elif meridiem == "am" and hour == 12:
+        hour = 0
+    if hour > 23 or minute > 59:
+        return None
+    local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=timezone(timedelta(hours=ZONE_OFFSETS[zone])))
+    return local.astimezone(timezone.utc).isoformat()
 
 
 def sentence_containing(text: str, needle: str) -> str | None:

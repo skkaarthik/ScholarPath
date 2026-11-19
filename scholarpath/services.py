@@ -11,14 +11,14 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from . import advisor, chat_context, config, repository as repo
 from .cleaning import content_hash, validate_many
 from .config import Clock
 from .database import DatabaseBusyError, connect, migrate, schema_version, transaction
-from .dates import dashboard_group, deadline_status
+from .dates import dashboard_group, deadline_status, record_closed
 from .matching import MatchResult, StudentProfile, evaluate
 from .models import TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord
 from .repository import SearchFilters
@@ -121,6 +121,13 @@ class ScholarPathService:
     def today(self) -> date:
         return self.clock.today()
 
+    def now(self) -> datetime:
+        """The current instant (UTC); deadlines close at an instant, not just on a date."""
+        return self.clock.now()
+
+    def now_iso(self) -> str:
+        return self.now().replace(microsecond=0).isoformat()
+
     # --- imports ----------------------------------------------------------------
 
     def import_file(self, path: Path) -> ImportReport:
@@ -206,13 +213,16 @@ class ScholarPathService:
     # --- reads -------------------------------------------------------------------
 
     def _view(self, rec: ScholarshipRecord, today: date) -> ScholarshipView:
-        status, days_left = deadline_status(rec.deadline_kind, rec.deadline_date, today)
-        return ScholarshipView(rec, status, days_left, dashboard_group(rec.deadline_kind, rec.deadline_date, today))
+        closed = record_closed(rec, self.now())
+        status, days_left = deadline_status(rec.deadline_kind, rec.deadline_date, today, closed)
+        return ScholarshipView(rec, status, days_left,
+                               dashboard_group(rec.deadline_kind, rec.deadline_date, today, closed))
 
     def search(self, filters: SearchFilters | None = None, sort: str = "deadline") -> list[ScholarshipView]:
+        """Active discovery: closed opportunities are left out unless filters.include_closed."""
         today = self.today()
         with connect(self.db_path) as conn:
-            ids = repo.search_ids(conn, filters or SearchFilters(), today, sort)
+            ids = repo.search_ids(conn, filters or SearchFilters(), today, sort, self.now_iso())
             return [self._view(r, today) for r in repo.load_records(conn, ids)]
 
     def get(self, scholarship_id: str) -> ScholarshipView | None:
@@ -239,7 +249,10 @@ class ScholarPathService:
         """
         question = advisor.check_question(question)
         today = self.today()
-        views = self.search(sort="deadline")
+        views = self.search(sort="deadline")          # open opportunities only
+        if current_id and current_id not in {v.record.id for v in views}:
+            current = self.get(current_id)               # a closed one being reviewed is still the context
+            views = views + ([current] if current else [])
         chat = chat_context.select(views, question, history, current_id, profile, self.applications())
         names = [c.view.record.name for c in chat.records]
         settings = advisor.settings_from_env()
@@ -263,6 +276,7 @@ class ScholarPathService:
             run = repo.latest_import_run(conn)
             data = {
                 "scholarships": repo.count_scholarships(conn),
+                "active": repo.count_active(conn, self.now_iso()),
                 "saved": len(repo.shortlist_ids(conn)),
                 "tracked": len(repo.application_list(conn)),
                 "oldest_collected": fresh["oldest_collected"],

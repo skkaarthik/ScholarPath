@@ -18,6 +18,7 @@ from scholarpath.ui import (applications, chatbot, common, data_sources, find, i
 st.set_page_config(page_title="ScholarPath", page_icon=str(style.ASSETS / "icon.svg"), layout="wide")
 style.inject()
 common.keep_state()
+common.sync_published_data()   # a newly published real dataset is imported once, then cached reads reset
 
 
 @st.cache_resource

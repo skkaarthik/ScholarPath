@@ -328,7 +328,7 @@ def test_gpt_oss_models_get_low_reasoning_effort(svc, live, monkeypatch):
 PANEL = """
 import streamlit as st
 from scholarpath.ui import chatbot
-chatbot.body(st.session_state.get("_test_page", "find"), in_dialog=False)
+chatbot.body(st.session_state.get("_test_page", "find"), in_fragment=False)
 """
 
 
@@ -361,14 +361,14 @@ def test_panel_shows_demo_mode_starters_and_a_labelled_answer(svc):
     assert len(starters) == 3
     at.button(key="chat_starter_1").click().run()
     assert "Demonstration answer" in all_text(at)
-    assert any(b.label.startswith("Review: ") for b in at.button)
+    assert any(b.key.startswith("chat_review_") for b in at.button if b.key)
     assert not [b for b in at.button if b.key and b.key.startswith("chat_starter_")]   # gone once chatting
 
 
 def test_panel_context_follows_the_reviewed_scholarship(svc, example_records, live):
     vega, cedar = sid(example_records, "vega-cs-masters"), sid(example_records, "cedar-public-health")
     at = panel("review", selected_id=vega)
-    assert "Talking about:** Vega Computer Science Master's Award" in all_text(at)
+    assert "Talking about: Vega Computer Science Master's Award" in all_text(at).replace("\\", "")
     assert [b.label for b in at.button if b.key and b.key.startswith("chat_starter_")][0] == \
         "Am I eligible for this scholarship?"
     ask(at, "What is the deadline?")
@@ -402,4 +402,10 @@ def test_ask_scholarpath_button_is_on_every_main_page(svc):
     at = run_app()
     for page in ("find", "saved", "applications"):
         goto(at, page)
-        assert at.button(key="chat_open").label == "Ask ScholarPath"
+        assert at.button(key="chat_open_btn").label == "Ask ScholarPath"
+    at.button(key="chat_open_btn").click().run()          # opens the window in place of the button
+    assert at.session_state["chat_open"] is True and "chat_open_btn" not in [b.key for b in at.button]
+    assert "ScholarPath assistant" in "\n".join(str(m.value) for m in at.markdown)
+    goto(at, "saved")                                      # stays open while moving between pages
+    at.button(key="chat_close").click().run()
+    assert at.session_state["chat_open"] is False and at.button(key="chat_open_btn")

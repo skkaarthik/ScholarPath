@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
-from . import config, repository as repo
+from . import advisor, config, repository as repo
 from .cleaning import content_hash, validate_many
 from .config import Clock
 from .database import DatabaseBusyError, connect, migrate, schema_version, transaction
@@ -219,6 +219,25 @@ class ScholarPathService:
         with connect(self.db_path) as conn:
             records = repo.load_records(conn, [scholarship_id])
         return self._view(records[0], self.today()) if records else None
+
+    # --- AI advisor (optional: hidden unless an API key is configured) -------------------
+
+    @staticmethod
+    def advisor_available() -> bool:
+        return advisor.settings_from_env() is not None
+
+    def ask_advisor(self, scholarship_id: str, question: str, history: list[tuple[str, str]]) -> str:
+        """Answer a question about one scholarship, grounded in its stored record."""
+        settings = advisor.settings_from_env()
+        if settings is None:
+            raise ServiceError("The AI advisor is not set up on this installation.")
+        view = self.get(scholarship_id)
+        if view is None:
+            raise ServiceError("This scholarship is no longer in the current dataset.")
+        try:
+            return advisor.ask(settings, view.record, question, history)
+        except advisor.AdvisorError as exc:
+            raise ServiceError(str(exc)) from None
 
     def filter_options(self) -> dict[str, list[str]]:
         with connect(self.db_path) as conn:

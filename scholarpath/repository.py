@@ -86,8 +86,16 @@ def set_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
 
 def existing_state(conn: sqlite3.Connection, scholarship_id: str) -> sqlite3.Row | None:
     return conn.execute(
-        "SELECT id, content_hash, manual_verified_at FROM scholarships WHERE id = ?", (scholarship_id,)
+        "SELECT id, content_hash, manual_verified_at, award_cycle FROM scholarships WHERE id = ?", (scholarship_id,)
     ).fetchone()
+
+
+def is_referenced(conn: sqlite3.Connection, scholarship_id: str) -> bool:
+    """True if the user saved it or has an application entry for it."""
+    return conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM shortlist WHERE scholarship_id = :id) "
+        "OR EXISTS (SELECT 1 FROM applications WHERE scholarship_id = :id)", {"id": scholarship_id},
+    ).fetchone()[0] == 1
 
 
 def _scholarship_params(rec: ScholarshipRecord, content_hash: str, now: str) -> dict:

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -20,7 +20,7 @@ from .config import Clock
 from .database import DatabaseBusyError, connect, migrate, schema_version, transaction
 from .dates import dashboard_group, deadline_status, record_closed
 from .matching import MatchResult, StudentProfile, evaluate
-from .models import TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord
+from .models import TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord, stable_id
 from .repository import SearchFilters
 
 MODE_TO_ORIGIN = {config.MODE_EXAMPLE: "example", config.MODE_REAL: "real_source"}
@@ -47,6 +47,7 @@ class ImportReport:
     rejected: list[dict] = field(default_factory=list)
     duplicates: int = 0
     marked_unavailable: int = 0
+    new_cycles: int = 0           # records kept apart because a saved/tracked one is an older cycle
 
     def summary(self) -> str:
         return (f"inserted={self.inserted} updated={self.updated} unchanged={self.unchanged} "
@@ -175,6 +176,7 @@ class ScholarPathService:
         try:
             with connect(self.db_path) as conn, transaction(conn):
                 for rec in accepted:
+                    rec = self._cycle_target(conn, rec, report)
                     digest = content_hash(rec)
                     existing = repo.existing_state(conn, rec.id)
                     if existing is None:
@@ -195,6 +197,59 @@ class ScholarPathService:
             self._log_run(started, report, "failed", f"Rolled back: {exc}")
             raise ImportFailed(f"Import rolled back, database unchanged: {exc}") from exc
         return report
+
+    @staticmethod
+    def _cycle_target(conn, rec: ScholarshipRecord, report: ImportReport) -> ScholarshipRecord:
+        """Annual cycles: where an incoming record is written.
+
+        A record keeps its stable ID while it stays in the same award cycle, or while nobody
+        saved or tracked it (then it simply moves on to the new cycle). If the stored record is
+        for an earlier cycle AND the user saved or applied to it, the new cycle becomes a
+        separate record with its own ID, so the old application keeps its original cycle and
+        deadline. Later imports of that cycle find and update the separate record.
+        """
+        if not rec.award_cycle:
+            return rec
+        cycle_key = f"{rec.source_key}#{rec.award_cycle}"
+        cycle_id = stable_id(rec.source_name, cycle_key)
+        if repo.existing_state(conn, cycle_id) is not None:
+            return replace(rec, id=cycle_id, source_key=cycle_key)
+        stored = repo.existing_state(conn, rec.id)
+        if (stored is not None and stored["award_cycle"] and stored["award_cycle"] != rec.award_cycle
+                and repo.is_referenced(conn, rec.id)):
+            report.new_cycles += 1
+            return replace(rec, id=cycle_id, source_key=cycle_key)
+        return rec
+
+    # --- published dataset (the scheduled refresh's output) -------------------------------
+
+    def imported_version(self) -> str | None:
+        if not self.database_exists():
+            return None
+        self.ensure_schema()
+        with connect(self.db_path) as conn:
+            return repo.get_meta(conn, "published_version")
+
+    def sync_published(self, path: Path = config.REAL_DATASET_FILE) -> str:
+        """Bring this database up to the published real dataset, once per dataset version.
+
+        Returns "imported", "current" or "missing". Idempotent: the version is stored in
+        the same transaction as the import, a second caller finds it current, and an
+        import changes scholarships only (saved items, applications and history are other
+        tables and are never touched). Only the Real dataset is synchronised.
+        """
+        from .refresh import load_published
+
+        if self.mode != config.MODE_REAL or not Path(path).exists():
+            return "missing"
+        payload = load_published(path)
+        version = payload["dataset_version"]
+        if self.imported_version() == version:
+            return "current"
+        self.import_records(payload.get("records", []), source_file=str(path),
+                            unavailable_urls=payload.get("unavailable_urls") or [],
+                            meta={"published_version": version})
+        return "imported"
 
     def _insert_run(self, conn, started: str, report: ImportReport, status: str, message: str) -> None:
         repo.record_import_run(conn, {

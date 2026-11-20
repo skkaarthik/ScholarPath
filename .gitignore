@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated databases and per-user data (never commit personal tracker notes)
+data/db/
+*.sqlite3
+*.sqlite3-journal
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Generated example dataset (rebuilt by `python -m scholarpath init-examples`)
+data/examples/build/
+
+# Partial or failed collection outputs
+data/collected/*.partial-*.json
+
+# Exports and backups made by the user
+exports/
+backups/
+
+# Secrets and editor/OS noise
+.env
+.streamlit/secrets.toml
+.DS_Store
+.idea/
+.vscode/
+
+# Scheduled refresh: lock and staging files (never committed)
+data/refresh/refresh.lock
+data/refresh/.state.json.tmp
+data/collected/.real_scholarships.json.staging

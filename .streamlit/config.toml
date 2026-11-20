@@ -1,0 +1,65 @@
+# Local single-user app: no telemetry, bind to this computer only.
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+
+[server]
+address = "localhost"
+headless = false
+
+# "Ink on paper" design system (see docs/DESIGN_SYSTEM.md).
+# Everything visual that Streamlit can theme natively is set here, so
+# scholarpath/ui/style.py only needs a small amount of CSS.
+[theme]
+base = "light"
+primaryColor = "#343A8C"                # ink indigo: actions, links, selected states
+backgroundColor = "#FBFAF6"             # warm paper
+secondaryBackgroundColor = "#F0EEE7"    # inputs, table headers
+textColor = "#121118"
+linkColor = "#2C3180"
+# Input borders need 3:1 against the page (WCAG 1.4.11): #857F72 is 3.8:1 on paper and
+# 3.4:1 on the input fill. Cards use a lighter hairline, set in style.py.
+borderColor = "#857F72"
+dataframeBorderColor = "#DDD9CE"
+# System fonts only: nothing is downloaded, so the app looks the same offline.
+font = "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif"
+headingFont = "'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif"
+headingFontSizes = ["2.1rem", "1.45rem", "1.15rem", "1rem", "0.95rem", "0.875rem"]
+headingFontWeights = [700, 700, 700, 700, 600, 600]
+baseFontSize = 16
+metricValueFontSize = "1.75rem"
+baseRadius = "0.5rem"
+buttonRadius = "0.5rem"
+showWidgetBorder = true
+paddingTop = "0.5rem"                   # the menu sits just under Streamlit's header row
+paddingBottom = "5rem"
+dataframeHeaderBackgroundColor = "#F0EEE7"
+chartCategoricalColors = ["#343A8C"]
+
+# Semantic states. Streamlit uses these for badges and for st.success / st.info /
+# st.warning / st.error, so every message and badge shares one muted palette.
+# Each text colour is at least 6:1 on its background.
+blueColor = "#343A8C"                   # information and "selected": the brand lavender
+blueBackgroundColor = "#E9E8F7"
+blueTextColor = "#343A8C"
+greenColor = "#2F7D57"                  # success, open deadline, met
+greenBackgroundColor = "#E4F1E8"
+greenTextColor = "#1F5C3D"
+orangeColor = "#B45F17"                 # needs attention soon
+orangeBackgroundColor = "#FBEBDA"
+orangeTextColor = "#8A4208"
+yellowColor = "#8F6A00"                 # warning, not confirmed
+yellowBackgroundColor = "#FAF1CF"
+yellowTextColor = "#6B4E00"
+redColor = "#B23A3A"                    # error, not met
+redBackgroundColor = "#FBE9E7"
+redTextColor = "#9B2C2C"
+grayColor = "#6B6975"                   # neutral, closed
+grayBackgroundColor = "#EDEAE2"
+grayTextColor = "#4B4955"
+
+[theme.sidebar]
+backgroundColor = "#F7F5EF"
+secondaryBackgroundColor = "#ECE9E0"

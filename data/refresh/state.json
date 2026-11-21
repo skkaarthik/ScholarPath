@@ -1,0 +1,28 @@
+{
+  "last_success_at": null,
+  "latest_attempt": {
+    "at": "2026-11-21T10:09:25+00:00",
+    "problems": [
+      "Page could not be read: https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/india (https://study-uk.britishcouncil.org/scholarships-funding/great-scholarships/india: disallowed by robots.txt)",
+      "British Council Study UK - GREAT Scholarships: no records collected"
+    ],
+    "status": "failed"
+  },
+  "sources": {
+    "cscuk": {
+      "accepted": 3,
+      "failed": 0,
+      "last_success_at": null,
+      "rejected": 0,
+      "status": "ok"
+    },
+    "great_india": {
+      "accepted": 0,
+      "failed": 1,
+      "last_success_at": null,
+      "rejected": 0,
+      "status": "failed"
+    }
+  },
+  "version": 1
+}

@@ -195,13 +195,38 @@ def dataset_ready(svc: ScholarPathService) -> bool:
                else "python -m scholarpath import-real")
     with st.container(border=True, key="card_setup_needed"):
         st.subheader(f"Set up the {config.MODE_LABELS[svc.mode].lower()}", anchor=False)
-        st.markdown("This dataset has no scholarships yet. In Terminal, inside the ScholarPath folder, run:")
-        st.code(command, language=None)
-        st.markdown("Then choose **Check again**. ScholarPath never swaps in the other dataset by itself.")
-        st.button("Check again", key="setup_retry", icon=":material/refresh:", on_click=after_write,
-                  type="primary")
+        if svc.mode == config.MODE_EXAMPLE:
+            # The fictional dataset can be built from inside the app, so a hosted copy (where
+            # nobody has a terminal) can still show it. Real data is never created this way.
+            st.markdown("This dataset has no scholarships yet. Create the fictional practice data here, "
+                        "or run this in Terminal inside the ScholarPath folder:")
+            st.code(command, language=None)
+            st.button("Create the example data", key="setup_create_examples", icon=":material/add:",
+                      on_click=create_example_data, type="primary")
+        else:
+            st.markdown("This dataset has no scholarships yet. In Terminal, inside the ScholarPath folder, run:")
+            st.code(command, language=None)
+            st.markdown("Then choose **Check again**. ScholarPath never swaps in the other dataset by itself.")
+            st.button("Check again", key="setup_retry", icon=":material/refresh:", on_click=after_write,
+                      type="primary")
         st.caption(f"Database file: {svc.db_path}")
     return False
+
+
+def create_example_data() -> None:
+    """Button callback: build and import the FICTIONAL example dataset (same as `init-examples`),
+    with deadlines relative to today."""
+    from ..examples import write_example_dataset
+
+    try:
+        svc = ScholarPathService(config.MODE_EXAMPLE)
+        path = write_example_dataset(config.Clock().today())
+        svc.ensure_schema()
+        svc.import_file(path)
+    except (ServiceError, ImportFailed, ValueError, *STORAGE_ERRORS) as exc:
+        st.session_state["flash_error"] = f"The example data could not be created: {exc}"
+        return
+    after_write()
 
 
 def after_write() -> None:

@@ -107,6 +107,17 @@ def test_missing_database_shows_setup_steps_without_fallback():
     assert "python -m scholarpath import-real" in texts(at) and not at.exception
 
 
+def test_example_data_can_be_created_from_the_app_but_real_data_cannot():
+    at = run_app()
+    click(at, "setup_create_examples")
+    assert not at.exception and not at.error
+    created = ScholarPathService(config.MODE_EXAMPLE).overview()["scholarships"]
+    assert created == 15 and "13 scholarships" in texts(at)                 # Find lists the open ones
+    at.sidebar.radio(key="mode").set_value(config.MODE_REAL).run()
+    assert "python -m scholarpath import-real" in texts(at)                 # real data: terminal only
+    assert not [b for b in at.button if b.key == "setup_create_examples"]
+
+
 def test_app_opens_on_find_scholarships(seeded):
     at = run_app()
     assert [t.value for t in at.title] == ["Find scholarships"]

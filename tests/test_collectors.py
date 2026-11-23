@@ -186,6 +186,14 @@ def test_live_fetcher_respects_robots_and_host_allow_list():
         fetcher(session).get("https://evil.example.com/page")
 
 
+def test_live_fetcher_says_when_the_site_refused_robots_txt_instead_of_blaming_robots_rules():
+    session = FakeSession({"https://example.org/robots.txt": [FakeResponse(403)]})
+    with pytest.raises(FetchError, match=r"refused access \(robots.txt answered HTTP 403\)") as info:
+        fetcher(session).get("https://example.org/page")
+    assert info.value.status == 403 and "disallowed by robots.txt" not in str(info.value)
+    assert session.calls == ["https://example.org/robots.txt"]               # the page itself is never fetched
+
+
 def test_live_fetcher_reports_404_status_for_unavailable_pages():
     session = FakeSession({
         "https://example.org/robots.txt": [FakeResponse(404)],

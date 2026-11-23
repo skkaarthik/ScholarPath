@@ -60,6 +60,7 @@ class LiveFetcher:
         self.max_retries = max_retries
         self._sleep = sleep
         self._robots: dict[str, robotparser.RobotFileParser] = {}
+        self._robots_refused: dict[str, int] = {}   # site root -> HTTP status that refused robots.txt
         self._last_request = 0.0
 
     def _polite_wait(self) -> None:
@@ -93,7 +94,10 @@ class LiveFetcher:
             if response.status_code == 200:
                 parser.parse(response.text.splitlines())
             elif response.status_code in (401, 403):
+                # The site refused to serve robots.txt to this machine (often a block on cloud
+                # servers). Treat it as "do not crawl", but remember why so the error says so.
                 parser.disallow_all = True
+                self._robots_refused[root] = response.status_code
             else:  # 404 and similar: no robots rules published
                 parser.allow_all = True
             self._robots[root] = parser
@@ -104,6 +108,11 @@ class LiveFetcher:
         if parsed.scheme != "https" or parsed.netloc not in self.allowed_hosts:
             raise FetchError(f"{url}: host not in the configured allow-list {sorted(self.allowed_hosts)}")
         if not self._robots_allows(url):
+            root = f"{parsed.scheme}://{parsed.netloc}"
+            refused = self._robots_refused.get(root)
+            if refused:
+                raise FetchError(f"{url}: the site refused access (robots.txt answered HTTP {refused}); "
+                                 "not crawled", refused)
             raise FetchError(f"{url}: disallowed by robots.txt")
         response = self._raw_get(url)
         if response.status_code != 200:

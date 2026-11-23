@@ -271,6 +271,17 @@ def test_daad_listing_entry_becomes_a_cautious_valid_record():
     assert record.source_key == "50026200" and record.manual_verified_at is None
 
 
+def test_daad_records_keep_facts_only_and_never_copy_daads_description_text():
+    from scholarpath.collectors import daad
+
+    items = list(daad.collect(_Pages({1: _daad_fixture()}), "2026-11-19T10:00:00+00:00"))
+    record = items[0][1]
+    stored = repr(record)
+    assert "wishing to continue their academic training" not in stored                   # DAAD's summary text
+    assert record["eligibility_text"].startswith("DAAD programme for: Graduates.")
+    assert "Country rule on DAAD: Only specified." in record["eligibility_text"]
+
+
 def test_daad_follows_pages_until_the_stated_total_and_never_imports_a_partial_list():
     from scholarpath.collectors import daad
 

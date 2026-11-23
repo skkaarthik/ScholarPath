@@ -76,7 +76,9 @@ def parse_listing(page: FetchedPage) -> tuple[int, list[dict]]:
         status = _dd(entry, "status")
         country = _dd(entry, "country")
         subject = _dd(entry, "subject")
-        summary = entry.select_one(".entry-detail")
+        # DAAD's own description text (.entry-detail) is deliberately not read: DAAD's imprint
+        # allows its text for personal, private, non-commercial use only, and this app may be
+        # hosted publicly. Only facts (title, provider, status, country rule, subjects, link) are kept.
         out.append({
             "detail": detail,
             "url": url,
@@ -87,9 +89,15 @@ def parse_listing(page: FetchedPage) -> tuple[int, list[dict]]:
             "country": (country.contents[0].get_text(" ", strip=True) if hasattr(country.contents[0], "get_text")
                         else str(country.contents[0]).strip()) if country and country.contents else "",
             "subject_groups": [li.get_text(" ", strip=True) for li in subject.select("li")] if subject else [],
-            "summary": summary.get_text(" ", strip=True) if summary else "",
         })
     return int(match.group(1)), out
+
+
+def eligibility_text(item: dict) -> str:
+    """A plain sentence built only from listed facts, never from DAAD's description text."""
+    who = ", ".join(item["statuses"]) if item["statuses"] else "not shown"
+    return (f"DAAD programme for: {who}. Country rule on DAAD: {item['country'] or 'not shown'}. "
+            "Full conditions, funding and the deadline for your country are on the DAAD programme page.")
 
 
 def to_record(item: dict, page: FetchedPage, collected_at: str) -> dict:
@@ -123,7 +131,7 @@ def to_record(item: dict, page: FetchedPage, collected_at: str) -> dict:
         "deadline_date": None,
         "deadline_timezone": TIMEZONE,
         "deadline_text": "",
-        "eligibility_text": item["summary"] or item["name"],
+        "eligibility_text": eligibility_text(item),
         "requirements": requirements,
         "application_url": item["url"],
         "source_url": item["url"],
@@ -135,8 +143,8 @@ def to_record(item: dict, page: FetchedPage, collected_at: str) -> dict:
         "fetch_method": page.method,
         "manual_verified_at": None,
         "dataset_origin": "real_source",
-        "notes": "Summary from the DAAD listing (shortened by DAAD); full conditions, value and the deadline for "
-                 "your country are on the programme page.",
+        "notes": "Facts from the DAAD scholarship database listing (DAAD's own description is not copied); full "
+                 "conditions, value and the deadline for your country are on the programme page.",
         "source_status": "available",
     }
 

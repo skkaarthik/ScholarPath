@@ -82,7 +82,7 @@ python -m pip install -r requirements-dev.txt
 ```bash
 python -m scholarpath init-examples   # fictional example DB (deadlines relative to today)
 python -m scholarpath import-real     # real-source DB from data/collected/real_scholarships.json
-python -m streamlit run app.py        # opens http://localhost:8501
+python -m streamlit run app.py --server.address localhost   # opens http://localhost:8501, this computer only
 ```
 
 Choose the dataset in the sidebar. Both datasets work **offline**.

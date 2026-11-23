@@ -1,13 +1,11 @@
-# Local single-user app: no telemetry, bind to this computer only.
+# No telemetry. The server address is not pinned here: Streamlit Community Cloud must be able
+# to reach the app. To keep a local run on this computer only, start it with
+# `python -m streamlit run app.py --server.address localhost`.
 [browser]
 gatherUsageStats = false
 
 [client]
 toolbarMode = "minimal"
-
-[server]
-address = "localhost"
-headless = false
 
 # "Ink on paper" design system (see docs/DESIGN_SYSTEM.md).
 # Everything visual that Streamlit can theme natively is set here, so

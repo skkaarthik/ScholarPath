@@ -63,3 +63,47 @@ def write_example_dataset(anchor: date, out_dir: Path = config.EXAMPLE_BUILD_DIR
     out_path = out_dir / "example_scholarships.json"
     out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return out_path
+
+
+# --- internships (v2): the same approach for the fictional internships ------------------------
+
+EXAMPLE_INTERNSHIP_NOTE = "FICTIONAL EXAMPLE - invented for demonstration; not a real internship."
+
+
+def build_example_internships(anchor: date, template_path: Path = config.EXAMPLE_INTERNSHIP_TEMPLATE,
+                              collected_at: str | None = None) -> dict:
+    from .models import internship_id
+
+    template = json.loads(Path(template_path).read_text(encoding="utf-8"))
+    source_name = template["source_name"]
+    collected_at = collected_at or config.utc_now_iso()
+    records = []
+    for item in template["records"]:
+        record = dict(item)
+        offset = record.pop("deadline_offset_days", None)
+        if record.get("deadline_kind") == "dated":
+            record["deadline_date"] = (anchor + timedelta(days=int(offset))).isoformat()
+            record["deadline_timezone"] = config.APP_TIMEZONE_NAME
+        else:
+            record["deadline_date"] = None
+        key = record["source_key"]
+        record.update({
+            "id": internship_id(record["employer"], record["title"], record["cities"], record["work_arrangement"]),
+            "source_name": source_name,
+            "source_url": f"https://example.org/scholarpath-fictional/internships/{key}",
+            "application_url": f"https://example.org/scholarpath-fictional/internships/{key}/apply",
+            "collected_at": collected_at, "source_fetched_at": None, "fetch_method": "fictional",
+            "manual_verified_at": None, "dataset_origin": "example", "notes": EXAMPLE_INTERNSHIP_NOTE,
+            "source_status": "available",
+        })
+        records.append(record)
+    return {"dataset_origin": "example", "example_anchor_date": anchor.isoformat(), "generated_at": collected_at,
+            "records": records}
+
+
+def write_example_internships(anchor: date, out_dir: Path = config.EXAMPLE_BUILD_DIR) -> Path:
+    payload = build_example_internships(anchor)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "example_internships.json"
+    out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return out_path

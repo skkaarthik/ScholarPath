@@ -1,0 +1,687 @@
+{
+  "description": "FICTIONAL internships for offline demonstrations and tests. Every employer, URL and amount is invented. Dated deadlines are offsets in days from an anchor date, as for the example scholarships.",
+  "source_name": "ScholarPath fictional examples",
+  "records": [
+    {
+      "source_key": "marina-data-analyst",
+      "title": "Data Analyst Intern",
+      "employer": "Marina Analytics (fictional)",
+      "cities": [
+        "Chennai"
+      ],
+      "states": [
+        "Tamil Nadu"
+      ],
+      "location_text": "Chennai, Tamil Nadu",
+      "work_arrangement": "hybrid",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "data"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor",
+          "master"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "3",
+          "4",
+          "final"
+        ]
+      },
+      "experience_text": "No prior experience required.",
+      "eligibility_text": "Students of B.E./B.Tech, B.Sc. or M.Sc. in their pre-final or final year.",
+      "stipend_kind": "paid",
+      "stipend_min": 15000,
+      "stipend_max": 20000,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 6,
+      "duration_text": "6 months",
+      "start_text": "January",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 4,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "kaveri-embedded",
+      "title": "Embedded Systems Intern",
+      "employer": "Kaveri Motors (fictional)",
+      "cities": [
+        "Chennai"
+      ],
+      "states": [
+        "Tamil Nadu"
+      ],
+      "location_text": "Chennai, Tamil Nadu",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "engineering"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor",
+          "diploma"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "final"
+        ]
+      },
+      "experience_text": "",
+      "eligibility_text": "Final-year students of electronics or electrical engineering.",
+      "stipend_kind": "paid",
+      "stipend_min": 12000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 4,
+      "duration_text": "4 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 11,
+      "deadline_text": "Applications close on the published date (fictional)."
+    },
+    {
+      "source_key": "adyar-ux",
+      "title": "UX Design Intern",
+      "employer": "Adyar Studio (fictional)",
+      "cities": [
+        "Chennai"
+      ],
+      "states": [
+        "Tamil Nadu"
+      ],
+      "location_text": "Chennai, Tamil Nadu",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "design"
+        ]
+      },
+      "degrees": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "study_years": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "experience_text": "A portfolio of two projects.",
+      "eligibility_text": "Open to students of any degree with a design portfolio.",
+      "stipend_kind": "paid_unstated",
+      "stipend_min": null,
+      "stipend_max": null,
+      "stipend_text": "Paid; the amount is not stated (fictional).",
+      "duration_months": 3,
+      "duration_text": "3 months",
+      "start_text": "",
+      "deadline_kind": "rolling",
+      "deadline_offset_days": null,
+      "deadline_text": "Applications are reviewed as they arrive (fictional)."
+    },
+    {
+      "source_key": "guindy-research",
+      "title": "Research Intern, Materials Lab",
+      "employer": "Guindy Institute of Technology (fictional)",
+      "cities": [
+        "Chennai"
+      ],
+      "states": [
+        "Tamil Nadu"
+      ],
+      "location_text": "Chennai, Tamil Nadu",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "research",
+          "engineering"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "master",
+          "phd"
+        ]
+      },
+      "study_years": {
+        "kind": "unknown",
+        "values": []
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 25000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 6,
+      "duration_text": "6 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": -6,
+      "deadline_text": "Closed on the published date (fictional)."
+    },
+    {
+      "source_key": "tnagar-marketing",
+      "title": "Content Marketing Intern",
+      "employer": "T. Nagar Retail (fictional)",
+      "cities": [
+        "Chennai"
+      ],
+      "states": [
+        "Tamil Nadu"
+      ],
+      "location_text": "Chennai, Tamil Nadu",
+      "work_arrangement": "remote",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "marketing"
+        ]
+      },
+      "degrees": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "study_years": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "unpaid",
+      "stipend_min": null,
+      "stipend_max": null,
+      "stipend_text": "Unpaid (fictional).",
+      "duration_months": 2,
+      "duration_text": "2 months",
+      "start_text": "",
+      "deadline_kind": "unknown",
+      "deadline_offset_days": null,
+      "deadline_text": "Apply before the end of the month (no year given, fictional)."
+    },
+    {
+      "source_key": "koramangala-sde",
+      "title": "Software Development Intern",
+      "employer": "Koramangala Labs (fictional)",
+      "cities": [
+        "Bengaluru"
+      ],
+      "states": [
+        "Karnataka"
+      ],
+      "location_text": "Bengaluru, Karnataka",
+      "work_arrangement": "hybrid",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "engineering"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor",
+          "master"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "3",
+          "4",
+          "final"
+        ]
+      },
+      "experience_text": "Familiarity with Python or Java.",
+      "eligibility_text": "B.E./B.Tech or M.Tech students graduating next year.",
+      "stipend_kind": "paid",
+      "stipend_min": 40000,
+      "stipend_max": 50000,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 6,
+      "duration_text": "6 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 2,
+      "deadline_text": "Applications close at the end of the published date (fictional)."
+    },
+    {
+      "source_key": "indiranagar-product",
+      "title": "Product Management Intern",
+      "employer": "Indiranagar Apps (fictional)",
+      "cities": [
+        "Bengaluru"
+      ],
+      "states": [
+        "Karnataka"
+      ],
+      "location_text": "Bengaluru, Karnataka",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "product",
+          "business"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "master"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "final"
+        ]
+      },
+      "experience_text": "",
+      "eligibility_text": "MBA students in their final year.",
+      "stipend_kind": "paid",
+      "stipend_min": 35000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 3,
+      "duration_text": "3 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 24,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "whitefield-finance",
+      "title": "Finance & Accounting Intern",
+      "employer": "Whitefield Capital (fictional)",
+      "cities": [
+        "Bengaluru"
+      ],
+      "states": [
+        "Karnataka"
+      ],
+      "location_text": "Bengaluru, Karnataka",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "finance"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor",
+          "master"
+        ]
+      },
+      "study_years": {
+        "kind": "unknown",
+        "values": []
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 18000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 6,
+      "duration_text": "6 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 45,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "jayanagar-hr",
+      "title": "People Operations Intern",
+      "employer": "Jayanagar Foods (fictional)",
+      "cities": [
+        "Bengaluru",
+        "Mysuru"
+      ],
+      "states": [
+        "Karnataka"
+      ],
+      "location_text": "Bengaluru, Mysuru, Karnataka",
+      "work_arrangement": "hybrid",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "people"
+        ]
+      },
+      "degrees": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "graduate"
+        ]
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid_unstated",
+      "stipend_min": null,
+      "stipend_max": null,
+      "stipend_text": "Paid; the amount is not stated (fictional).",
+      "duration_months": null,
+      "duration_text": "",
+      "start_text": "",
+      "deadline_kind": "unknown",
+      "deadline_offset_days": null,
+      "deadline_text": ""
+    },
+    {
+      "source_key": "hitec-ml",
+      "title": "Machine Learning Intern",
+      "employer": "HITEC Robotics (fictional)",
+      "cities": [
+        "Hyderabad"
+      ],
+      "states": [
+        "Telangana"
+      ],
+      "location_text": "Hyderabad, Telangana",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "engineering",
+          "data"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor",
+          "master",
+          "phd"
+        ]
+      },
+      "study_years": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 30000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 6,
+      "duration_text": "6 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 15,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "pune-legal",
+      "title": "Legal Intern",
+      "employer": "Deccan Law Chambers (fictional)",
+      "cities": [
+        "Pune"
+      ],
+      "states": [
+        "Maharashtra"
+      ],
+      "location_text": "Pune, Maharashtra",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "legal"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 10000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 1,
+      "duration_text": "1 month",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 8,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "bkc-marketing",
+      "title": "Brand Marketing Intern",
+      "employer": "BKC Media (fictional)",
+      "cities": [
+        "Mumbai"
+      ],
+      "states": [
+        "Maharashtra"
+      ],
+      "location_text": "Mumbai, Maharashtra",
+      "work_arrangement": "hybrid",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "marketing"
+        ]
+      },
+      "degrees": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "study_years": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 15000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 3,
+      "duration_text": "3 months",
+      "start_text": "",
+      "deadline_kind": "rolling",
+      "deadline_offset_days": null,
+      "deadline_text": "Rolling applications (fictional)."
+    },
+    {
+      "source_key": "gurugram-business",
+      "title": "Business Analyst Intern",
+      "employer": "Cyber City Consulting (fictional)",
+      "cities": [
+        "Delhi NCR"
+      ],
+      "states": [
+        "Haryana"
+      ],
+      "location_text": "Delhi NCR, Haryana",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "business",
+          "data"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "bachelor",
+          "master"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "final",
+          "graduate"
+        ]
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 20000,
+      "stipend_max": 25000,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 6,
+      "duration_text": "6 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 33,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "kochi-research",
+      "title": "Marine Biology Research Intern",
+      "employer": "Kochi Ocean Institute (fictional)",
+      "cities": [
+        "Kochi"
+      ],
+      "states": [
+        "Kerala"
+      ],
+      "location_text": "Kochi, Kerala",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "research"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "master"
+        ]
+      },
+      "study_years": {
+        "kind": "unknown",
+        "values": []
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "unpaid",
+      "stipend_min": null,
+      "stipend_max": null,
+      "stipend_text": "Unpaid (fictional).",
+      "duration_months": 2,
+      "duration_text": "2 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 19,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "coimbatore-mech",
+      "title": "Mechanical Design Intern",
+      "employer": "Kovai Pumps (fictional)",
+      "cities": [
+        "Coimbatore"
+      ],
+      "states": [
+        "Tamil Nadu"
+      ],
+      "location_text": "Coimbatore, Tamil Nadu",
+      "work_arrangement": "onsite",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "engineering"
+        ]
+      },
+      "degrees": {
+        "kind": "list",
+        "values": [
+          "diploma",
+          "bachelor"
+        ]
+      },
+      "study_years": {
+        "kind": "list",
+        "values": [
+          "2",
+          "3"
+        ]
+      },
+      "experience_text": "",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 8000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 2,
+      "duration_text": "2 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 6,
+      "deadline_text": "Apply by the published date (fictional)."
+    },
+    {
+      "source_key": "remote-frontend",
+      "title": "Frontend Developer Intern",
+      "employer": "Anywhere Software (fictional)",
+      "cities": [],
+      "states": [],
+      "location_text": "Remote, India",
+      "work_arrangement": "remote",
+      "disciplines": {
+        "kind": "list",
+        "values": [
+          "engineering",
+          "design"
+        ]
+      },
+      "degrees": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "study_years": {
+        "kind": "unrestricted",
+        "values": []
+      },
+      "experience_text": "Built at least one web project.",
+      "eligibility_text": "",
+      "stipend_kind": "paid",
+      "stipend_min": 20000,
+      "stipend_max": null,
+      "stipend_text": "Fixed monthly stipend (fictional).",
+      "duration_months": 3,
+      "duration_text": "3 months",
+      "start_text": "",
+      "deadline_kind": "dated",
+      "deadline_offset_days": 28,
+      "deadline_text": "Apply by the published date (fictional)."
+    }
+  ]
+}

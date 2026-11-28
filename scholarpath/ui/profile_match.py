@@ -13,8 +13,9 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from ..matching import DISCLAIMER, FAILED, SATISFIED, UNKNOWN, StudentProfile, validate_profile
-from ..models import DEGREES, SCORE_SCALES, SUBJECTS
+from ..matching import (DISCLAIMER, FAILED, SATISFIED, UNKNOWN, InternshipProfile, StudentProfile,
+                        validate_internship_profile, validate_profile)
+from ..models import DEGREES, DISCIPLINES, INTERN_DEGREES, SCORE_SCALES, STUDY_YEARS, SUBJECTS
 from . import common
 
 NOT_SET = ""
@@ -35,7 +36,16 @@ EMPTY_GROUP = {
     "no_fit": "Nothing ruled out by the recorded requirements.",
 }
 FIELD_NAMES = {"Nationality": "citizenship", "Nationality exclusions": "citizenship", "Degree": "degree",
-               "Subject": "subject", "Academic score": "score"}
+               "Subject": "subject", "Academic score": "score", "Year of study": "year of study",
+               "Discipline": "discipline"}
+I_HOW_IT_WORKS = """
+- **Degree** is compared with the degrees the posting mentions (diploma, bachelor's, master's, PhD).
+- **Year of study** is compared with the years the posting asks for. "Final year" counts only if you tick that it is your final year: ScholarPath never guesses how long your course is.
+- **Discipline** is compared with ScholarPath's reading of the role title and team (for example *Data Analyst Intern* is Data & analytics).
+- **Where you would like to work** only narrows the list. It is not a requirement.
+- Anything you leave blank, and anything the posting does not state, counts as *not checked*, never as met.
+- Skills, documents and experience are listed for you to confirm on the employer's page.
+"""
 HOW_IT_WORKS = """
 - **Citizenship** is compared with each scholarship's lists of eligible and excluded countries, by exact country name.
 - **Degree** and **subject** are compared with the levels and subject areas recorded for it. Subject labels are broad and matched exactly.
@@ -155,7 +165,40 @@ def _form(options: dict) -> StudentProfile | None:
     return profile
 
 
+def _internship_form(options: dict) -> InternshipProfile | None:
+    """The same form card for internships. Returns the submitted profile, or None."""
+    places = [NOT_SET, "remote"] + options["cities"]
+    with st.form("profile_form", border=False):
+        st.header("About you", anchor=False)
+        st.caption("Every field is optional. Anything left blank is treated as not checked, never as a match.")
+        c1, c2 = st.columns(2, gap="large")
+        degree = c1.selectbox("Degree you are studying (or finished)", [NOT_SET] + list(INTERN_DEGREES), key="im_degree",
+                              format_func=lambda v: INTERN_DEGREES.get(v, "Choose a degree"))
+        year = c1.selectbox("Year of study", [NOT_SET] + [k for k in STUDY_YEARS if k != "final"], key="im_year",
+                            format_func=lambda v: STUDY_YEARS.get(v, "Choose a year"))
+        final = c1.checkbox("This is the final year of my course", key="im_final")
+        discipline = c2.selectbox("Discipline", [NOT_SET] + list(DISCIPLINES), key="im_disc",
+                                  format_func=lambda v: DISCIPLINES.get(v, "Choose a discipline"))
+        place = c2.selectbox("Where would you like to work?", places, key="im_place",
+                             format_func=lambda v: {NOT_SET: "Anywhere in India", "remote": "Remote"}.get(v, v),
+                             help="Only narrows the list. It is not a requirement.")
+        submitted = st.form_submit_button("Check my fit", type="primary", icon=":material/fact_check:")
+    if not submitted:
+        return None
+    profile = InternshipProfile(degree=degree or None, year=year or None, final_year=bool(final),
+                                discipline=discipline or None, preferred_place=place or None)
+    errors = validate_internship_profile(profile)
+    if errors:
+        st.session_state.pop("match_results", None)
+        for error in errors:
+            st.error(error, icon=":material/error:")
+        return None
+    return profile
+
+
 def render(svc) -> None:
+    if common.is_internship(svc):
+        return _render_internships(svc)
     common.page_header(svc, "Check my fit",
                        "Enter what you know about yourself. ScholarPath compares each answer with the "
                        "requirements it recorded for every scholarship and shows which rules you meet, which "
@@ -201,6 +244,57 @@ def render(svc) -> None:
     if profile.preferred_destination:
         st.caption(f"Showing scholarships hosted in {profile.preferred_destination} only.")
 
+    _result_tabs(groups)
+
+
+def _group(results) -> dict:
+    groups: dict[str, list] = {key: [] for key in GROUPS}
+    for view, match in results:
+        groups[match.group].append((view, match))
+    for items in groups.values():  # full matches first inside "Good fits", then by name
+        items.sort(key=lambda pair: (pair[1].overall != "Matches recorded requirements", pair[0].record.name))
+    return groups
+
+
+def _render_internships(svc) -> None:
+    common.page_header(svc, "Check my fit",
+                       "Enter what you know about yourself. ScholarPath compares each answer with what each "
+                       "internship's posting states and shows which you meet, which you don't, and which it could "
+                       "not check. Your answers stay in this browser tab and are not saved.")
+    if not common.dataset_ready(svc):
+        return
+    with st.container(border=True, key="card_fit_form"):
+        profile = _internship_form(common.cached_options(str(svc.db_path), svc.kind))
+        with st.expander("How the check works, and its limits", key="fit_how", icon=":material/info:"):
+            st.markdown(I_HOW_IT_WORKS)
+            st.caption(DISCLAIMER)
+    if profile is not None:
+        st.session_state["match_profile"] = profile
+        with st.spinner("Comparing your answers with each internship..."):
+            st.session_state["match_results"] = svc.match(profile)
+    results = st.session_state.get("match_results")
+    if results is None:
+        st.info("Fill in what you know and choose **Check my fit**. Anything you leave blank is shown as "
+                "*not enough information*, never as a match.", icon=":material/lightbulb:")
+        return
+    profile = st.session_state["match_profile"]
+    if not results:
+        common.empty_state("fit_none", "No internships in that place",
+                           "Nothing in this dataset is in that place. Choose *Anywhere in India* above and check again.")
+        return
+    st.header("Your results", anchor=False)
+    st.info(DISCLAIMER, icon=":material/info:")
+    blanks = sorted({name for name, value in (("degree", profile.degree), ("year of study", profile.year),
+                                              ("discipline", profile.discipline)) if not value})
+    if blanks:
+        st.markdown(f"Tip: add your {_join(blanks)} to move more internships out of *Need more info*.")
+    if profile.preferred_place:
+        shown = "remote internships" if profile.preferred_place == "remote" else f"internships in {profile.preferred_place}"
+        st.caption(f"Showing {shown} only.")
+    _result_tabs(_group(results))
+
+
+def _result_tabs(groups: dict) -> None:
     labels = {key: f"{meta['icon']} {meta['title']} ({len(groups[key])})" for key, meta in GROUPS.items()}
     first_with_results = next((key for key in GROUPS if groups[key]), "fit")
     tabs = st.tabs(list(labels.values()), default=labels[first_with_results])

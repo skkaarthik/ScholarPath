@@ -1,6 +1,7 @@
 """Applications (step 4): every application the user confirmed, with its status at a glance.
 
-Each entry shows scholarship, provider, status and the next step. "Update
+The same page for scholarships and internships (each type has its own entries).
+Each entry shows scholarship (or role), provider (or employer), status and the next step. "Update
 status" opens the edit fields for that entry; saving writes to SQLite and the
 confirmation appears in the entry only after the write succeeded.
 "Remove" asks for confirmation inside the entry, then deletes the entry and its
@@ -26,6 +27,12 @@ NEXT_STEP = {
     "interested": "Next: apply on the provider's website, then choose Mark as applied on the scholarship's page.",
     "preparing": "Next: apply on the provider's website, then choose Mark as applied on the scholarship's page.",
     "applied": "Next: when the provider replies, open Update status and choose Result received.",
+    "result_received": "",
+}
+I_NEXT_STEP = {
+    "interested": "Next: apply on the employer's website, then choose Mark as applied on the internship's page.",
+    "preparing": "Next: apply on the employer's website, then choose Mark as applied on the internship's page.",
+    "applied": "Next: when the employer replies, open Update status and choose Result received.",
     "result_received": "",
 }
 MESSAGES = {"success": st.success, "info": st.info, "error": st.error}
@@ -85,9 +92,10 @@ def _remove(svc, scholarship_id: str, name: str) -> None:
 
 def _confirm_remove(svc, app, name: str) -> None:
     sid = app.scholarship_id
+    noun = common.WORDS[svc.kind]["noun"]
     with st.container(border=True, key=f"app_confirm_remove_{sid}"):
         st.markdown("**Remove this application?** Its status, notes and history are deleted and can't be "
-                    "restored. The scholarship itself stays in Find (and in Saved, if you saved it).")
+                    f"restored. The {noun} itself stays in Find (and in Saved, if you saved it).")
         with st.container(horizontal=True):
             st.button("Yes, remove", key=f"app_remove_yes_{sid}", on_click=_remove, args=(svc, sid, name),
                       icon=":material/delete:")
@@ -136,11 +144,11 @@ def _entry(svc, app, view, today, opened: bool) -> None:
         with text:
             st.subheader(common.md_escape(rec.name), anchor=False)
             st.markdown(f"{common.md_escape(rec.provider)}  \n{common.application_line(app)}")
-            next_step = NEXT_STEP.get(app.status, "")
+            next_step = (I_NEXT_STEP if svc.kind == "internship" else NEXT_STEP).get(app.status, "")
             st.caption(f"Official deadline: {common.deadline_plain(view)}" + (f"  \n{next_step}" if next_step else ""))
         with action:
-            common.review_button(view, "app", back="applications", label="View scholarship", type="tertiary",
-                                 width="stretch")
+            common.review_button(view, "app", back="applications", label=f"View {common.WORDS[svc.kind]['noun']}",
+                                 type="tertiary", width="stretch")
             st.button("Remove", key=f"app_remove_{sid}", on_click=_ask_remove, args=(sid,), type="tertiary",
                       icon=":material/delete:", width="stretch")
         if st.session_state.get("app_remove") == sid:
@@ -163,9 +171,10 @@ def render(svc) -> None:
         st.success(f"Removed “{common.md_escape(removed)}” from Applications.", icon=":material/check_circle:")
     apps = svc.applications()
     if not apps:
+        w = common.WORDS[svc.kind]
         common.empty_state("applications", "No applications yet",
-                           "When you have applied for a scholarship, choose **Mark as applied** on its page "
-                           "and it appears here.", "Find scholarships", "find", icon=":material/search:")
+                           f"When you have applied for {w['a']}, choose **Mark as applied** on its page "
+                           "and it appears here.", w["find_button"], "find", icon=":material/search:")
         return
     today = svc.today()
     records = {v.record.id: v for v in common.all_views(svc, include_closed=True)}   # tracked ones may be closed

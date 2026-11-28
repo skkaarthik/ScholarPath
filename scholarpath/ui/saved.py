@@ -1,4 +1,4 @@
-"""Saved: scholarships kept for later, grouped by how soon they close.
+"""Saved: scholarships or internships kept for later, grouped by how soon they close.
 
 Saving is optional. Each row reopens the Review page, so the user picks up
 where they left off (apply, or mark as applied). Removing a row only changes
@@ -41,7 +41,8 @@ def _undo_notice(svc) -> None:
 
 
 def render(svc) -> None:
-    common.page_header(svc, "Saved scholarships")
+    w = common.WORDS[svc.kind]
+    common.page_header(svc, f"Saved {w['nouns']}")
     if not common.dataset_ready(svc):
         return
     common.flash()
@@ -49,11 +50,11 @@ def render(svc) -> None:
     views = svc.shortlist()
     if not views:
         common.empty_state("saved", "Nothing saved yet",
-                           "Saving is optional. Choose **Save for later** on a scholarship to keep it here "
-                           "and come back to it.", "Find scholarships", "find", icon=":material/search:")
+                           f"Saving is optional. Choose **Save for later** on {w['a']} to keep it here "
+                           "and come back to it.", w["find_button"], "find", icon=":material/search:")
         return
-    st.caption(f"{common.plural(len(views), 'scholarship')} saved, soonest deadline first.")
-    applications = {a.scholarship_id: a for a in svc.applications()}
+    st.caption(f"{common.plural(len(views), w['noun'])} saved, soonest deadline first.")
+    applications = {a.item_id: a for a in svc.applications()}
     for group in GROUP_ORDER:
         items = sorted((v for v in views if v.group == group),
                        key=lambda v: (v.record.deadline_date or date.max, v.record.name))

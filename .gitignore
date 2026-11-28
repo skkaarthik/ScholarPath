@@ -39,3 +39,6 @@ backups/
 data/refresh/refresh.lock
 data/refresh/.state.json.tmp
 data/collected/.real_scholarships.json.staging
+
+# Live internship finder: temporary file while publishing (never committed)
+data/collected/.real_internships.json.tmp

@@ -135,16 +135,18 @@ h1, h2, h3 { overflow-wrap: anywhere; }             /* very long titles wrap ins
    are the first screen: two equal white cards, one primary action each. */
 .st-key-kind_bar { margin-bottom: 0.25rem; }
 .st-key-kind_bar label p { color: var(--sp-ink-2); font-size: 0.875rem; }
-.st-key-kind_bar [data-testid="stButtonGroup"] button { min-height: 2.75rem; }
+.st-key-kind_pick button { min-height: 2.75rem; }
 .st-key-nav_switch_kind { border-top: 1px solid var(--sp-line); padding-top: 0.25rem; margin-top: 0.25rem; }
 .st-key-nav_switch_kind button { justify-content: flex-start; min-height: 2.75rem; color: var(--sp-ink-2); }
 .st-key-choose_page { max-width: 52rem; margin: 2.5rem auto 0; }
-[class*="st-key-card_choose_"] { height: 100%; padding: 0.5rem 0.25rem; }
+/* Equal cards side by side; each card's button sits at its foot so the two line up. */
+.st-key-choose_cards { flex-wrap: wrap; align-items: stretch !important; }
+.st-key-choose_cards > * { flex: 1 1 18rem; min-width: 0; }
+[class*="st-key-card_choose_"] { padding: 0.5rem 0.25rem; }
+[class*="st-key-card_choose_"] > :last-child { margin-top: auto; }
 [class*="st-key-card_choose_"] h3 { font-size: 1.45rem; }
 @media (max-width: 40rem) {
   .st-key-choose_page { margin-top: 1rem; }
-  .st-key-kind_bar [data-testid="stButtonGroup"] { width: 100%; }
-  .st-key-kind_bar [data-testid="stButtonGroup"] button { flex: 1 1 0; }
 }
 
 /* --- Assistant ---------------------------------------------------------------------

@@ -28,11 +28,16 @@ def render() -> None:
         st.title("What are you looking for?", anchor=False)
         st.markdown("ScholarPath helps you find, review, save and track opportunities. Choose one to start; "
                     "you can switch at any time from the menu.")
-        columns = st.columns(2, gap="medium")
-        for column, (kind, icon, label, text) in zip(columns, CHOICES):
-            with column, st.container(border=True, key=f"card_choose_{kind}"):
-                st.subheader(f"{icon} {label[5:].capitalize()}", anchor=False)
-                st.markdown(text)
-                st.button(label, key=f"choose_{kind}", on_click=common.choose_kind, args=(kind,), type="primary",
-                          icon=":material/arrow_forward:", icon_position="right", width="stretch")
+        # A row of two equal cards that wraps to one per line on a phone (style.py: choose_cards).
+        with st.container(horizontal=True, gap="medium", key="choose_cards"):
+            for kind, icon, label, text in CHOICES:
+                _choice(kind, icon, label, text)
         st.caption("Runs only on this computer. ScholarPath never submits anything to an employer or a provider.")
+
+
+def _choice(kind: str, icon: str, label: str, text: str) -> None:
+    with st.container(border=True, key=f"card_choose_{kind}"):
+        st.subheader(f"{icon} {label[5:].capitalize()}", anchor=False)
+        st.markdown(text)
+        st.button(label, key=f"choose_{kind}", on_click=common.choose_kind, args=(kind,), type="primary",
+                  icon=":material/arrow_forward:", icon_position="right", width="stretch")

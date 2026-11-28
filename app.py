@@ -124,7 +124,8 @@ with st.sidebar:
              help="Each dataset has its own database, saved list and tracker. Nothing is shared between them.")
     st.button(common.words()["switch_label"], key="sidebar_switch_kind", on_click=common.switch_kind,
               args=(common.words()["other"],), icon=":material/swap_horiz:")
-    st.caption("Runs only on this computer. ScholarPath never submits anything to a scholarship provider.")
+    st.caption("Runs only on this computer. ScholarPath never submits anything to "
+               + ("an employer." if common.current_kind() == config.KIND_INTERNSHIP else "a scholarship provider."))
 
 _menu(page)
 _kind_bar()

@@ -19,8 +19,9 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from .dates import GROUPS, describe_deadline
-from .matching import FAILED, SATISFIED, StudentProfile, evaluate
-from .models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, TRACKER_OUTCOMES, TRACKER_STATUSES
+from .matching import FAILED, SATISFIED, InternshipProfile, StudentProfile, evaluate, evaluate_internship
+from .models import (DEGREES, DISCIPLINES, FUNDING_CATEGORIES, INTERN_DEGREES, STIPEND_KINDS, STUDY_YEARS, SUBJECTS,
+                     TRACKER_OUTCOMES, TRACKER_STATUSES, WORK_ARRANGEMENTS, InternshipRecord)
 
 MAX_RECORDS = 4                 # other scholarships per question (keeps the prompt small)
 MAX_TEXT = 400                  # characters of source wording per scholarship
@@ -28,7 +29,8 @@ MAX_CURRENT_TEXT = 900          # more for the scholarship being reviewed
 
 STOPWORDS = set("""a an the and or of for to in on at by with from is are be am i me my we our you your it this that
 these those what which who how when where why can could should would do does did any some about tell show give list
-want need please scholarship scholarships there their them as if so than then into more most best good""".split())
+want need please scholarship scholarships internship internships intern interns there their them as if so than then
+into more most best good""".split())
 PROGRESS_WORDS = {"application", "applications", "applied", "status", "progress", "track", "tracking", "result",
                   "results", "submitted", "outcome", "awarded", "waiting", "heard"}
 COMPARE_WORDS = {"other", "others", "similar", "alternative", "alternatives", "else", "instead", "compare"}
@@ -68,7 +70,8 @@ def words(text: str) -> set[str]:
 
 
 GENERIC_NAME_WORDS = {"master's", "masters", "global", "international", "award", "awards", "programme", "program",
-                      "university", "phd", "fund", "fellowship", "fellowships", "great", "excellence", "graduate"}
+                      "university", "phd", "fund", "fellowship", "fellowships", "great", "excellence", "graduate",
+                      "intern", "internship", "trainee"}
 
 
 def name_words(name: str) -> set[str]:
@@ -82,6 +85,11 @@ def _labels(restriction, labels: dict) -> list[str]:
 
 
 def _record_words(rec) -> set[str]:
+    if isinstance(rec, InternshipRecord):
+        return words(" ".join([rec.title, rec.employer, " ".join(rec.cities), " ".join(rec.states),
+                               WORK_ARRANGEMENTS.get(rec.work_arrangement, ""),
+                               " ".join(_labels(rec.disciplines, DISCIPLINES)),
+                               "paid stipend" if rec.stipend_kind.startswith("paid") else ""]))
     parts = [rec.name, rec.provider, " ".join(rec.host_countries), " ".join(_labels(rec.degrees, DEGREES)),
              " ".join(_labels(rec.subjects, SUBJECTS)), " ".join(rec.nationalities.values),
              FUNDING_CATEGORIES.get(rec.funding_category, "")]
@@ -98,7 +106,7 @@ def detect_intent(question: str, has_current: bool) -> str:
 
 
 def _evaluate(profile, rec, ctx: ContextRecord) -> None:
-    result = evaluate(profile, rec)
+    result = evaluate_internship(profile, rec) if isinstance(profile, InternshipProfile) else evaluate(profile, rec)
     ctx.verdict = result.overall
     for r in result.rules:
         line = f"{r.rule}: {r.reason}"
@@ -174,9 +182,46 @@ def _restriction(r, labels: dict | None = None) -> str:
     return "NOT STATED"
 
 
+def _stipend_line(rec) -> str:
+    if rec.stipend_kind == "paid":
+        low, high = rec.stipend_min, rec.stipend_max
+        amount = f"Rs {low:,}" if high in (None, low) else (f"up to Rs {high:,}" if low is None else f"Rs {low:,}-{high:,}")
+        return f"{amount} per month"
+    return STIPEND_KINDS.get(rec.stipend_kind, "NOT STATED")
+
+
+def describe_internship(ctx: ContextRecord, today: date, current: bool) -> str:
+    """One internship as compact text for the model (facts only, no employer description text)."""
+    rec, view = ctx.view.record, ctx.view
+    lines = [
+        f"[{ctx.tag}] {clean(rec.title, 160)} - {clean(rec.employer, 120)}" + ("  (BEING REVIEWED)" if current else ""),
+        f"  Status: {GROUPS.get(view.group, view.group)}; deadline: {describe_deadline(rec.deadline_kind, rec.deadline_date, today)}",
+        f"  Where: {', '.join(rec.cities) or ', '.join(rec.states) or 'NOT STATED'}; arrangement: "
+        f"{WORK_ARRANGEMENTS.get(rec.work_arrangement, 'NOT STATED')}",
+        f"  Discipline: {_restriction(rec.disciplines, DISCIPLINES)}; degree: {_restriction(rec.degrees, INTERN_DEGREES)}; "
+        f"year of study: {_restriction(rec.study_years, STUDY_YEARS)}",
+        f"  Stipend: {_stipend_line(rec)}; duration: {clean(rec.duration_text, 80) or 'NOT STATED'}",
+    ]
+    if rec.experience_text:
+        lines.append(f"  Experience: {clean(rec.experience_text, 160)}")
+    if rec.eligibility_text:
+        lines.append(f"  Recorded facts: {clean(rec.eligibility_text, MAX_CURRENT_TEXT if current else MAX_TEXT)}")
+    lines.append(f"  Employer's page: {rec.application_url or rec.source_url or 'NOT RECORDED'}")
+    if rec.fetch_method == "fictional":
+        lines.append("  NOTE: fictional practice record, not a real internship.")
+    if ctx.verdict:
+        lines.append(f"  Check against the student's profile: {ctx.verdict}")
+        for label, items in (("meets", ctx.met), ("does not meet", ctx.not_met), ("needs verification", ctx.to_verify)):
+            if items:
+                lines.append(f"    {label}: " + " | ".join(clean(i, 140) for i in items[:4]))
+    return "\n".join(lines)
+
+
 def describe(ctx: ContextRecord, today: date, current: bool) -> str:
     """One scholarship as compact text for the model."""
     rec, view = ctx.view.record, ctx.view
+    if isinstance(rec, InternshipRecord):
+        return describe_internship(ctx, today, current)
     lines = [
         f"[{ctx.tag}] {clean(rec.name, 160)} - {clean(rec.provider, 120)}" + ("  (BEING REVIEWED)" if current else ""),
         f"  Status: {GROUPS.get(view.group, view.group)}; deadline: {describe_deadline(rec.deadline_kind, rec.deadline_date, today)}",
@@ -208,6 +253,13 @@ def describe(ctx: ContextRecord, today: date, current: bool) -> str:
 def profile_text(profile: StudentProfile | None) -> str:
     if profile is None:
         return "Not provided (the student has not filled in Check my fit)."
+    if isinstance(profile, InternshipProfile):
+        parts = [f"degree {INTERN_DEGREES.get(profile.degree, profile.degree)}" if profile.degree else "",
+                 f"year of study {STUDY_YEARS.get(profile.year, profile.year)}" if profile.year else "",
+                 "in the final year" if profile.final_year else "",
+                 f"discipline {DISCIPLINES.get(profile.discipline, profile.discipline)}" if profile.discipline else "",
+                 f"prefers {profile.preferred_place}" if profile.preferred_place else ""]
+        return ", ".join(p for p in parts if p) or "Provided, but every field is blank."
     parts = [f"nationality {profile.nationality}" if profile.nationality else "",
              f"degree {DEGREES.get(profile.degree, profile.degree)}" if profile.degree else "",
              f"subject {SUBJECTS.get(profile.subject, profile.subject)}" if profile.subject else "",
@@ -216,18 +268,22 @@ def profile_text(profile: StudentProfile | None) -> str:
     return ", ".join(p for p in parts if p) or "Provided, but every field is blank."
 
 
-def context_block(chat: ChatContext, today: date, profile: StudentProfile | None, dataset_label: str) -> str:
+def context_block(chat: ChatContext, today: date, profile: StudentProfile | None, dataset_label: str,
+                  kind: str = "scholarship") -> str:
+    noun = "INTERNSHIP" if kind == "internship" else "SCHOLARSHIP"
     out = [f"Dataset: {dataset_label}. Today: {today.isoformat()}."]
     if chat.profile_used:
         out.append(f"Student profile (from Check my fit): {profile_text(profile)}")
     elif chat.intent == "recommend":
-        out.append("Student profile: not provided. Ask for nationality, degree level and subject if they are "
+        needed = ("degree, year of study and discipline" if kind == "internship"
+                  else "nationality, degree level and subject")
+        out.append(f"Student profile: not provided. Ask for {needed} if they are "
                    "needed and not already in the conversation.")
     if chat.records:
-        out.append("SCHOLARSHIP RECORDS (the only scholarships you may mention):")
+        out.append(f"{noun} RECORDS (the only {noun.lower()}s you may mention):")
         out += [describe(c, today, c.tag == chat.current_tag) for c in chat.records]
     else:
-        out.append("SCHOLARSHIP RECORDS: none matched this question.")
+        out.append(f"{noun} RECORDS: none matched this question.")
     if chat.applications is not None:
         if chat.applications:
             out.append("THE STUDENT'S APPLICATION ENTRIES (from ScholarPath's tracker):")

@@ -35,7 +35,7 @@ HOSTS = {"greenhouse": "boards-api.greenhouse.io", "lever": "api.lever.co"}
 class Board:
     platform: str          # "greenhouse" | "lever"
     token: str             # the employer's board name on that platform
-    employer: str          # shown when the platform does not send a company name
+    employer: str          # the employer's name on every board (dedup across platforms relies on it)
     focus: str             # why it is listed: the city where it posts interns (documentation only)
 
     @property
@@ -67,7 +67,6 @@ BOARDS = (
     Board("greenhouse", "enterpret", "Enterpret", "Bengaluru"),
     Board("greenhouse", "karya", "Karya", "Bengaluru"),
     Board("greenhouse", "hackerrank", "HackerRank", "Bengaluru"),
-    Board("greenhouse", "interviewkickstart", "Interview Kickstart", "Bengaluru"),
     Board("lever", "fampay", "FamPay", "Bengaluru"),
     Board("lever", "epifi", "Fi (epiFi)", "Bengaluru"),
     Board("lever", "zeta", "Zeta", "Bengaluru"),
@@ -131,7 +130,7 @@ def parse_greenhouse(board: Board, payload: str, fetched_at: str) -> tuple[list[
         team = " ".join(d.get("name", "") for d in job.get("departments") or [] if isinstance(d, dict))
         body = facts.plain_text(job.get("content") or "")
         record = _record(board, posting_id=str(job.get("id")), title=title,
-                         employer=(job.get("company_name") or board.employer).strip(), location=location,
+                         employer=board.employer, location=location,   # one name per employer on every board
                          arrangement=parse_location(location + " " + body[:300])["arrangement"], team=team,
                          body=body, url=job.get("absolute_url") or "", fetched_at=fetched_at,
                          deadline=job.get("application_deadline") or None, extra_places=offices)

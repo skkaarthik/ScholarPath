@@ -22,9 +22,11 @@ import streamlit as st
 from .. import config
 from ..cleaning import is_http_url
 from ..dates import STATUS_LABELS
-from ..models import DEGREES, FUNDING_CATEGORIES, SUBJECTS, TRACKER_OUTCOMES, TRACKER_STATUSES, ScholarshipRecord
-from ..repository import SearchFilters
-from ..services import STORAGE_ERRORS, ImportFailed, ScholarPathService, ServiceError
+from ..locations import place_text
+from ..models import (DEGREES, DISCIPLINES, FUNDING_CATEGORIES, INTERN_DEGREES, STIPEND_KINDS, STUDY_YEARS, SUBJECTS,
+                      TRACKER_OUTCOMES, TRACKER_STATUSES, WORK_ARRANGEMENTS, InternshipRecord, ScholarshipRecord)
+from ..repository import InternshipFilters, SearchFilters
+from ..services import STORAGE_ERRORS, ImportFailed, InternshipService, ScholarPathService, ServiceError, service_for
 
 # slug -> (title in the menu, icon). The app follows one sequence:
 # Find a scholarship -> Review it -> Apply on the provider's site -> Track the application.
@@ -38,6 +40,8 @@ PAGE_INFO = {
     "data": ("Data & sources", ":material/database:"),
     "review": ("Review scholarship", ":material/description:"),
 }
+# v2: the same pages serve internships. Only these titles change with the opportunity type.
+INTERNSHIP_TITLES = {"find": "Find Internships", "review": "Review internship"}
 MAIN_PAGES = ("find", "saved", "applications")   # the three main menu items
 MORE_PAGES = ("fit", "insights", "data")         # listed under "More"
 MORE = "more"                                    # menu_item() value for the "More" button
@@ -63,21 +67,45 @@ TRACKER_BADGES = {"interested": "gray", "preparing": "gray", "applied": "blue", 
 OUTCOME_BADGES = {"awarded": "green", "waitlisted": "orange", "not_selected": "gray", "withdrawn": "gray",
                   "other": "gray"}
 
+# Words that change with the opportunity type. Everything else on the pages is shared.
+WORDS = {
+    config.KIND_SCHOLARSHIP: {
+        "noun": "scholarship", "nouns": "scholarships", "Noun": "Scholarship", "Nouns": "Scholarships",
+        "a": "a scholarship", "find": "Find Scholarships", "find_button": "Find scholarships",
+        "provider_site": "provider's site", "provider": "provider", "other": config.KIND_INTERNSHIP,
+        "switch_label": "Switch to internships", "chooser": "Find scholarships",
+    },
+    config.KIND_INTERNSHIP: {
+        "noun": "internship", "nouns": "internships", "Noun": "Internship", "Nouns": "Internships",
+        "a": "an internship", "find": "Find Internships", "find_button": "Find internships",
+        "provider_site": "employer's site", "provider": "employer", "other": config.KIND_SCHOLARSHIP,
+        "switch_label": "Switch to scholarships", "chooser": "Find internships",
+    },
+}
+KIND_LABELS = {config.KIND_INTERNSHIP: "Internships", config.KIND_SCHOLARSHIP: "Scholarships"}
+
 # Empty values of the Find filters and the Check my fit form. To clear a widget its key is
 # set to one of these, never deleted: the browser keeps its own copy of every widget value
 # and would send the old one back on the next click (see reset_widgets).
 FILTER_DEFAULTS = {"f_text": "", "f_hosts": [], "f_degrees": [], "f_subjects": [], "f_funding": [], "f_status": []}
 FIT_DEFAULTS = {"m_nat": "", "m_nat_other": "", "m_dest": "", "m_degree": "", "m_subject": "", "m_score": None,
                 "m_scale": ""}
+# The same for internships (their own keys, so each type keeps its own search when switching).
+I_FILTER_DEFAULTS = {"i_text": "", "i_place": "all_india", "i_cities": [], "i_states": [], "i_arr": [], "i_disc": [],
+                     "i_stipend": [], "i_status": []}
+I_FIT_DEFAULTS = {"im_degree": "", "im_year": "", "im_final": False, "im_disc": "", "im_place": ""}
 FILTER_KEYS = tuple(FILTER_DEFAULTS)
 FIT_KEYS = tuple(FIT_DEFAULTS)
 # Widget values that should survive a visit to another page. Streamlit forgets the
 # value of any widget that is not drawn on the current page unless we keep it alive.
-PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_filters", "mode")
-# Temporary selections (not widgets) that must not survive a dataset switch.
+PERSIST_KEYS = FILTER_KEYS + FIT_KEYS + ("f_sort", "f_page", "f_table", "ins_filters", "mode") + \
+    tuple(I_FILTER_DEFAULTS) + tuple(I_FIT_DEFAULTS) + ("i_sort", "i_page", "i_table", "i_ins_filters")
+# Temporary selections (not widgets) that must not survive a dataset switch. They belong to one
+# opportunity type, so switching type puts them aside and brings them back on the way back.
 MODE_SCOPED_KEYS = ("selected_id", "review_back", "match_results", "match_profile", "tracker_pick",
                     "confirm_apply", "confirm_error", "just_applied", "app_message", "saved_undo",
                     "app_remove", "app_removed", "chat_log", "chat_pending", "chat_context_id")
+KIND_SCOPED_KEYS = MODE_SCOPED_KEYS
 PAGE_SIZE = 10
 
 
@@ -121,6 +149,81 @@ def current_mode() -> str:
     return st.session_state.setdefault("mode", config.MODE_EXAMPLE)
 
 
+def current_kind() -> str | None:
+    """The opportunity type chosen on the first screen (None until the student chooses)."""
+    kind = st.session_state.get("kind")
+    return kind if kind in config.KINDS else None
+
+
+def kind_or_default() -> str:
+    return current_kind() or config.KIND_SCHOLARSHIP
+
+
+def words() -> dict:
+    return WORDS[kind_or_default()]
+
+
+def page_title(slug: str) -> str:
+    """Menu and heading title of a page for the current opportunity type."""
+    if kind_or_default() == config.KIND_INTERNSHIP and slug in INTERNSHIP_TITLES:
+        return INTERNSHIP_TITLES[slug]
+    return PAGE_INFO[slug][0]
+
+
+def remember_kind_in_url() -> None:
+    """Keep the choice in the address (?for=internships) so a reload does not ask again."""
+    kind = current_kind()
+    if kind:
+        wanted = "internships" if kind == config.KIND_INTERNSHIP else "scholarships"
+        if st.query_params.get("for") != wanted:
+            st.query_params["for"] = wanted
+
+
+def restore_kind_from_url() -> None:
+    """A reload starts a new session; the address still says which type was chosen."""
+    if current_kind() is None:
+        chosen = {"internships": config.KIND_INTERNSHIP, "scholarships": config.KIND_SCHOLARSHIP}.get(
+            st.query_params.get("for", ""))
+        if chosen:
+            st.session_state["kind"] = chosen
+
+
+def choose_kind(kind: str) -> None:
+    """Button callback on the first screen: open that type's Find page straight away."""
+    st.session_state["kind"] = kind
+    st.session_state["_goto"] = "find"
+
+
+def switch_kind(kind: str) -> None:
+    """Button/segment callback: change the opportunity type and return to where the student was.
+
+    Each type keeps its own search, filters, sort, page and form answers (different widget keys,
+    kept alive by keep_state). Its open selections (the record on Review, an unfinished
+    confirmation, the assistant's conversation) are put aside and brought back on return.
+    """
+    ss = st.session_state
+    old = current_kind()
+    if kind not in config.KINDS or kind == old:
+        return
+    if old:
+        ss[f"_kept_{old}"] = {key: ss[key] for key in KIND_SCOPED_KEYS if key in ss}
+    for key in KIND_SCOPED_KEYS:
+        ss.pop(key, None)
+    ss.update(ss.pop(f"_kept_{kind}", {}))
+    ss["kind"] = kind
+    page = ss.get("_page")
+    if page == "review" and not ss.get("selected_id"):
+        ss["_goto"] = "find"
+
+
+def on_kind_segment() -> None:
+    """The type switch under the menu (a segmented control keyed "kind_pick")."""
+    chosen = st.session_state.get("kind_pick")
+    if chosen:
+        switch_kind(chosen)
+    st.session_state["kind_pick"] = current_kind()
+
+
 def reset_widgets(defaults: dict) -> None:
     """Clear widgets by assigning their empty values, so the cleared state also reaches the browser."""
     for key, value in defaults.items():
@@ -128,10 +231,14 @@ def reset_widgets(defaults: dict) -> None:
 
 
 def on_mode_change() -> None:
-    """A dataset switch starts clean: no filters, form answers or selections from the other dataset."""
-    reset_widgets({**FILTER_DEFAULTS, **FIT_DEFAULTS, "f_sort": "deadline", "f_page": 1})
+    """A dataset switch starts clean: no filters, form answers or selections from the other dataset
+    (for either opportunity type)."""
+    reset_widgets({**FILTER_DEFAULTS, **FIT_DEFAULTS, "f_sort": "deadline", "f_page": 1,
+                   **I_FILTER_DEFAULTS, **I_FIT_DEFAULTS, "i_sort": "deadline", "i_page": 1})
     for key in MODE_SCOPED_KEYS:
         st.session_state.pop(key, None)
+    for kind in config.KINDS:
+        st.session_state.pop(f"_kept_{kind}", None)
 
 
 def switch_mode(mode: str) -> None:
@@ -149,7 +256,12 @@ def go_to(page: str, scholarship_id: str | None = None, back: str | None = None)
 
 
 def service() -> ScholarPathService:
-    return ScholarPathService(current_mode())
+    """The service for the chosen opportunity type in the chosen dataset."""
+    return service_for(kind_or_default(), current_mode())
+
+
+def is_internship(svc) -> bool:
+    return isinstance(svc, InternshipService)
 
 
 def run_page(render) -> None:
@@ -177,9 +289,13 @@ def page_header(svc: ScholarPathService, title: str, intro: str = "") -> None:
 
 def dataset_notice(svc: ScholarPathService) -> None:
     """One line saying which dataset is showing and how far to trust it."""
+    w = WORDS[svc.kind]
     if svc.mode == config.MODE_EXAMPLE:
         st.caption(":orange-badge[Example data] Invented for practice, so don't apply to these. "
-                   "To see collected scholarships, change the dataset on Data & sources.")
+                   f"To see collected {w['nouns']}, change the dataset on Data & sources.")
+    elif is_internship(svc):
+        st.caption(":blue-badge[Real sources] Collected from employers' public job boards. Details can change, "
+                   "so confirm on the employer's page before you apply.")
     else:
         st.caption(":blue-badge[Real sources] Collected from official pages. Details can change, so "
                    "confirm on the provider's page before you apply.")
@@ -187,24 +303,26 @@ def dataset_notice(svc: ScholarPathService) -> None:
 
 def dataset_ready(svc: ScholarPathService) -> bool:
     """Explain how to set up an empty dataset (never a silent fallback to the other one)."""
+    w = WORDS[svc.kind]
     if svc.database_exists():
         svc.ensure_schema()
-        if cached_overview(str(svc.db_path), time_key(svc))["scholarships"] > 0:
+        if cached_overview(str(svc.db_path), time_key(svc), svc.kind)["scholarships"] > 0:
             return True
-    command = ("python -m scholarpath init-examples" if svc.mode == config.MODE_EXAMPLE
-               else "python -m scholarpath import-real")
+    real_command = ("python -m scholarpath find-internships --import" if is_internship(svc)
+                    else "python -m scholarpath import-real")
+    command = "python -m scholarpath init-examples" if svc.mode == config.MODE_EXAMPLE else real_command
     with st.container(border=True, key="card_setup_needed"):
         st.subheader(f"Set up the {config.MODE_LABELS[svc.mode].lower()}", anchor=False)
         if svc.mode == config.MODE_EXAMPLE:
             # The fictional dataset can be built from inside the app, so a hosted copy (where
             # nobody has a terminal) can still show it. Real data is never created this way.
-            st.markdown("This dataset has no scholarships yet. Create the fictional practice data here, "
+            st.markdown(f"This dataset has no {w['nouns']} yet. Create the fictional practice data here, "
                         "or run this in Terminal inside the ScholarPath folder:")
             st.code(command, language=None)
             st.button("Create the example data", key="setup_create_examples", icon=":material/add:",
                       on_click=create_example_data, type="primary")
         else:
-            st.markdown("This dataset has no scholarships yet. In Terminal, inside the ScholarPath folder, run:")
+            st.markdown(f"This dataset has no {w['nouns']} yet. In Terminal, inside the ScholarPath folder, run:")
             st.code(command, language=None)
             st.markdown("Then choose **Check again**. ScholarPath never swaps in the other dataset by itself.")
             st.button("Check again", key="setup_retry", icon=":material/refresh:", on_click=after_write,
@@ -216,13 +334,15 @@ def dataset_ready(svc: ScholarPathService) -> bool:
 def create_example_data() -> None:
     """Button callback: build and import the FICTIONAL example dataset (same as `init-examples`),
     with deadlines relative to today."""
-    from ..examples import write_example_dataset
+    from ..examples import write_example_dataset, write_example_internships
 
     try:
         svc = ScholarPathService(config.MODE_EXAMPLE)
-        path = write_example_dataset(config.Clock().today())
+        today = config.Clock().today()
+        path = write_example_dataset(today)
         svc.ensure_schema()
         svc.import_file(path)
+        InternshipService(config.MODE_EXAMPLE).import_file(write_example_internships(today))
     except (ServiceError, ImportFailed, ValueError, *STORAGE_ERRORS) as exc:
         st.session_state["flash_error"] = f"The example data could not be created: {exc}"
         return
@@ -282,27 +402,34 @@ def time_key(svc: ScholarPathService) -> str:
     now = svc.now()
     return now.replace(minute=now.minute - now.minute % CACHE_WINDOW_MINUTES, second=0).isoformat()
 
-def _svc_for(db_path: str) -> ScholarPathService:
+def _svc_for(db_path: str, kind: str = config.KIND_SCHOLARSHIP) -> ScholarPathService:
     mode = config.MODE_EXAMPLE if db_path == str(config.db_path(config.MODE_EXAMPLE)) else config.MODE_REAL
-    return ScholarPathService(mode, db_path=db_path)
+    return service_for(kind, mode, db_path=db_path)
+
+
+S_FILTER_FIELDS = ("text", "host_countries", "degrees", "subjects", "funding", "deadline_statuses", "include_closed")
+I_FILTER_FIELDS = ("text", "place", "cities", "states", "arrangements", "disciplines", "stipends", "deadline_statuses",
+                   "include_closed")
 
 
 @st.cache_data(show_spinner=False)
-def cached_search(db_path: str, when: str, filters: tuple, sort: str):
-    keys = ("text", "host_countries", "degrees", "subjects", "funding", "deadline_statuses", "include_closed")
-    values = dict(zip(keys, filters))
+def cached_search(db_path: str, when: str, filters: tuple, sort: str, kind: str = config.KIND_SCHOLARSHIP):
+    """Cached search for either type; ``filters`` is filters_key() of that type's filters."""
+    internship = kind == config.KIND_INTERNSHIP
+    values = dict(zip(I_FILTER_FIELDS if internship else S_FILTER_FIELDS, filters))
     values = {k: (list(v) if isinstance(v, tuple) else v) for k, v in values.items()}
-    return _svc_for(db_path).search(SearchFilters(**values), sort)
+    chosen = InternshipFilters(**values) if internship else SearchFilters(**values)
+    return _svc_for(db_path, kind).search(chosen, sort)
 
 
 @st.cache_data(show_spinner=False)
-def cached_overview(db_path: str, when: str) -> dict:
-    return _svc_for(db_path).overview()
+def cached_overview(db_path: str, when: str, kind: str = config.KIND_SCHOLARSHIP) -> dict:
+    return _svc_for(db_path, kind).overview()
 
 
 @st.cache_data(show_spinner=False)
-def cached_options(db_path: str) -> dict:
-    return _svc_for(db_path).filter_options()
+def cached_options(db_path: str, kind: str = config.KIND_SCHOLARSHIP) -> dict:
+    return _svc_for(db_path, kind).filter_options()
 
 
 # --- the published real dataset reaches the running app ------------------------------------
@@ -313,6 +440,22 @@ def _published_version(path: str, modified_ns: int) -> str | None:
     from ..refresh import load_published
 
     return load_published(Path(path))["dataset_version"]
+
+
+@st.cache_resource(show_spinner=False)
+def _sync_internships_once(db_path: str, version: str, db_existed: bool) -> str:
+    """The same for the live internship finder's dataset (its own version, its own tables)."""
+    result = _svc_for(db_path, config.KIND_INTERNSHIP).sync_published(config.REAL_INTERNSHIPS_FILE)
+    if result == "imported":
+        st.cache_data.clear()
+    return result
+
+
+@st.cache_data(show_spinner=False)
+def _internships_version(path: str, modified_ns: int) -> str | None:
+    import json
+
+    return json.loads(Path(path).read_text(encoding="utf-8")).get("dataset_version")
 
 
 @st.cache_resource(show_spinner=False)
@@ -329,29 +472,50 @@ def _sync_once(db_path: str, version: str, db_existed: bool) -> str:
 
 
 def sync_published_data() -> None:
-    """Called by app.py on every run; cheap unless the published dataset changed."""
-    path = Path(config.REAL_DATASET_FILE)
-    if not path.exists():
-        return
+    """Called by app.py on every run; cheap unless a published dataset changed."""
     real_db = config.db_path(config.MODE_REAL)
-    try:
-        version = _published_version(str(path), path.stat().st_mtime_ns)
-        if version:
-            _sync_once(str(real_db), version, real_db.exists())
-    except (ImportFailed, ValueError, OSError, *STORAGE_ERRORS):
-        pass   # the last imported data stays usable; the next run tries again (failures are not cached)
+    path = Path(config.REAL_DATASET_FILE)
+    if path.exists():
+        try:
+            version = _published_version(str(path), path.stat().st_mtime_ns)
+            if version:
+                _sync_once(str(real_db), version, real_db.exists())
+        except (ImportFailed, ValueError, OSError, *STORAGE_ERRORS):
+            pass   # the last imported data stays usable; the next run tries again (failures are not cached)
+    path = Path(config.REAL_INTERNSHIPS_FILE)
+    if path.exists():
+        try:
+            version = _internships_version(str(path), path.stat().st_mtime_ns)
+            if version:
+                _sync_internships_once(str(real_db), version, real_db.exists())
+        except (ImportFailed, ValueError, OSError, *STORAGE_ERRORS):
+            pass
 
 
 def all_views(svc: ScholarPathService, sort: str = "deadline", include_closed: bool = False):
     """Every open opportunity; with include_closed, also closed ones (for pages that must reach
     a saved or tracked record whatever its state, and for Data & sources)."""
-    return cached_search(str(svc.db_path), time_key(svc), filters_key(SearchFilters(include_closed=include_closed)),
-                         sort)
+    empty = (InternshipFilters if is_internship(svc) else SearchFilters)(include_closed=include_closed)
+    return cached_search(str(svc.db_path), time_key(svc), filters_key(empty), sort, svc.kind)
 
 
-def filters_key(f: SearchFilters) -> tuple:
+def filters_key(f) -> tuple:
+    if isinstance(f, InternshipFilters):
+        return (f.text, f.place, tuple(f.cities), tuple(f.states), tuple(f.arrangements), tuple(f.disciplines),
+                tuple(f.stipends), tuple(f.deadline_statuses), f.include_closed)
     return (f.text, tuple(f.host_countries), tuple(f.degrees), tuple(f.subjects), tuple(f.funding),
             tuple(f.deadline_statuses), f.include_closed)
+
+
+def internship_filters() -> InternshipFilters:
+    """Current Find Internships selections (temporary UI state only)."""
+    ss = st.session_state
+    return InternshipFilters(
+        text=ss.get("i_text") or "", place=ss.get("i_place") or "all_india",
+        cities=list(ss.get("i_cities") or []), states=list(ss.get("i_states") or []),
+        arrangements=list(ss.get("i_arr") or []), disciplines=list(ss.get("i_disc") or []),
+        stipends=list(ss.get("i_stipend") or []), deadline_statuses=list(ss.get("i_status") or []),
+    )
 
 
 def find_filters() -> SearchFilters:
@@ -440,6 +604,51 @@ def funding_text(rec: ScholarshipRecord) -> str:
     return FUNDING_CATEGORIES.get(rec.funding_category, rec.funding_category)
 
 
+def rupees(value: int) -> str:
+    """Indian digit grouping: 150000 -> '₹1,50,000'."""
+    digits = str(int(value))
+    if len(digits) > 3:
+        head, tail = digits[:-3], digits[-3:]
+        head = ",".join([head[max(0, i - 2):i] for i in range(len(head), 0, -2)][::-1])
+        digits = f"{head},{tail}"
+    return f"₹{digits}"
+
+
+def stipend_text(rec: InternshipRecord) -> str:
+    """'₹15,000-₹20,000 a month', 'Unpaid', 'Paid (amount not stated)' or 'Stipend not stated'."""
+    if rec.stipend_kind == "paid":
+        low, high = rec.stipend_min, rec.stipend_max
+        if low is not None and high not in (None, low):
+            return f"{rupees(low)}-{rupees(high)} a month"
+        return f"{rupees(low if low is not None else high)} a month" if low is not None else f"Up to {rupees(high)} a month"
+    return {"unpaid": "Unpaid", "paid_unstated": "Paid (amount not stated)"}.get(rec.stipend_kind, "Stipend not stated")
+
+
+def internship_place(rec: InternshipRecord) -> str:
+    return place_text(rec.cities, rec.states, rec.work_arrangement)
+
+
+def arrangement_text(rec: InternshipRecord) -> str:
+    return WORK_ARRANGEMENTS.get(rec.work_arrangement, rec.work_arrangement) if rec.work_arrangement != "unknown" \
+        else "Work arrangement not stated"
+
+
+def duration_text(rec: InternshipRecord) -> str:
+    return rec.duration_text or "Duration not stated"
+
+
+def discipline_text(rec: InternshipRecord) -> str:
+    return restriction_text(rec.disciplines.kind, rec.disciplines.values, DISCIPLINES)
+
+
+def intern_degree_text(rec: InternshipRecord) -> str:
+    return restriction_text(rec.degrees.kind, rec.degrees.values, {k: v.split(" (")[0] for k, v in INTERN_DEGREES.items()})
+
+
+def year_text(rec: InternshipRecord) -> str:
+    return restriction_text(rec.study_years.kind, rec.study_years.values, STUDY_YEARS)
+
+
 def level_text(rec: ScholarshipRecord) -> str:
     """Level of study in a few words, or '' when the source does not give one."""
     if rec.degrees.kind == "list":
@@ -447,8 +656,17 @@ def level_text(rec: ScholarshipRecord) -> str:
     return "Any level" if rec.degrees.kind == "unrestricted" else ""
 
 
-def where_text(rec: ScholarshipRecord) -> str:
-    """Country, level of study and funding in one plain line (only what the source states)."""
+def where_text(rec) -> str:
+    """Country, level of study and funding in one plain line (only what the source states).
+    For an internship: place, work arrangement, stipend and duration."""
+    if isinstance(rec, InternshipRecord):
+        parts = [internship_place(rec)]
+        if rec.work_arrangement != "unknown" and not (rec.work_arrangement == "remote" and not rec.cities):
+            parts.append(WORK_ARRANGEMENTS[rec.work_arrangement])
+        parts.append(stipend_text(rec) if rec.stipend_kind != "unknown" else "Stipend not stated")
+        if rec.duration_text:
+            parts.append(rec.duration_text)
+        return " · ".join(parts)
     funding = "Funding not stated" if rec.funding_category == "unknown" else f"Funding: {funding_text(rec)}"
     return " · ".join(p for p in (", ".join(rec.host_countries), level_text(rec), funding) if p)
 
@@ -458,11 +676,12 @@ def freshness_text(rec: ScholarshipRecord, today: date) -> str:
     if rec.fetch_method == "fictional":
         return "Fictional example record"
     parts = []
+    checked_word = "checked" if isinstance(rec, InternshipRecord) else "read"
     try:
         read_on = datetime.fromisoformat(rec.source_fetched_at or rec.collected_at).date()
         age = (today - read_on).days
         ago = "today" if age <= 0 else f"{plural(age, 'day')} ago"
-        parts.append(f"Source read {fmt_date(read_on)} ({ago})")
+        parts.append(f"Source {checked_word} {fmt_date(read_on)} ({ago})")
     except ValueError:
         parts.append("Source read date not recorded")
     parts.append("checked by a person" if rec.manual_verified_at else "not yet checked by a person")
@@ -527,6 +746,17 @@ def application_line(app) -> str:
 
 
 def results_table(views, today) -> list[dict]:
+    if views and isinstance(views[0].record, InternshipRecord):
+        return [{
+            "Internship": v.record.title,
+            "Employer": v.record.employer,
+            "Where": internship_place(v.record),
+            "Arrangement": WORK_ARRANGEMENTS.get(v.record.work_arrangement, "Not stated"),
+            "Stipend": stipend_text(v.record),
+            "Duration": duration_text(v.record),
+            "Deadline": deadline_plain(v),
+            "Information": freshness_text(v.record, today),
+        } for v in views]
     return [{
         "Scholarship": v.record.name,
         "Provider": v.record.provider,

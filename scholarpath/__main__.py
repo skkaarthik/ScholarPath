@@ -9,6 +9,8 @@ Commands
   migrate         Apply pending schema migrations (never deletes data).
   ai-check        Send one tiny request to the configured AI provider and report the result.
   refresh         Scheduled refresh: collect live, validate, publish atomically (when 15 days are due).
+  find-internships   Live internship finder: read every job board, deduplicate, publish, report coverage.
+  import-internships Import the published internship dataset into the real DB.
 
 Real-data collection is always an explicit command; the Streamlit app never
 scrapes on startup or rerun.
@@ -25,8 +27,8 @@ from pathlib import Path
 from . import config
 from .collectors.runner import SOURCES, CollectionError, enabled_source_ids, run_collection, write_collection
 from .database import backup
-from .examples import write_example_dataset
-from .services import ImportFailed, ScholarPathService
+from .examples import write_example_dataset, write_example_internships
+from .services import ImportFailed, InternshipService, ScholarPathService
 
 
 def _print_report(report) -> None:
@@ -44,6 +46,60 @@ def cmd_init_examples(args) -> int:
     report = service.import_file(path)
     print(f"Imported into {service.db_path}")
     _print_report(report)
+    interns = InternshipService(config.MODE_EXAMPLE)
+    report = interns.import_file(write_example_internships(anchor))
+    print("Fictional example internships imported into the same database:")
+    _print_report(report)
+    return 0
+
+
+def cmd_find_internships(args) -> int:
+    """Read every internship job board live, then publish and (optionally) import."""
+    from .collectors import internship_runner as finder
+
+    output = Path(args.output)
+    previous = finder.load_previous(output)
+    print(f"Reading {len(finder.BOARDS)} job boards live (Greenhouse and Lever public APIs) ...")
+    run = finder.collect(previous=previous)
+    for src in run.sources:
+        line = (f"  {'OK    ' if src['status'] == 'ok' else 'FAILED'} {src['source_name']}: "
+                + (f"{src['listed']} postings, {src['internships']} internships in India" if src["status"] == "ok"
+                   else f"{src['error']} (kept {src['carried_over']} earlier records)"))
+        print(line)
+    for item in run.rejected[:10]:
+        print(f"  REJECTED {item['source_name']}: {item['title']}: {'; '.join(item['reasons'])}")
+    cover = finder.coverage(run.records)
+    print(f"Sources read: {len(run.succeeded)} of {len(run.sources)}; duplicates merged: {run.duplicates_merged}")
+    print(f"Unique internships: {cover['unique']} | Chennai {cover['chennai']} | Bengaluru {cover['bengaluru']} | "
+          f"rest of India {cover['rest_of_india']} | remote {cover['remote']}")
+    if args.dry_run:
+        print("Dry run: nothing was written.")
+        return 0 if run.succeeded else 2
+    try:
+        target = finder.write_dataset(run, output)
+    except finder.InternshipCollectionError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(f"Wrote {target}")
+    if args.import_now:
+        return cmd_import_internships(argparse.Namespace(file=str(target)))
+    print("Next: python -m scholarpath import-internships (the app also picks it up by itself)")
+    return 0 if not run.failed else 1
+
+
+def cmd_import_internships(args) -> int:
+    path = Path(args.file)
+    if not path.exists():
+        print(f"ERROR: {path} not found. Run `python -m scholarpath find-internships` first.", file=sys.stderr)
+        return 2
+    service = InternshipService(config.MODE_REAL)
+    service.ensure_schema()
+    try:
+        state = service.sync_published(path)
+    except ImportFailed as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(f"Internships in {service.db_path}: {state} | {service.coverage()}")
     return 0
 
 
@@ -101,6 +157,8 @@ def cmd_status(_args) -> int:
         info = service.overview()
         print(f"  schema v{service.schema_version()} | scholarships={info['scholarships']} "
               f"saved={info['saved']} tracked={info['tracked']}")
+        interns = InternshipService(mode).overview()
+        print(f"  internships={interns['scholarships']} saved={interns['saved']} tracked={interns['tracked']}")
         if info["last_import"]:
             print(f"  last import: {info['last_import']['finished_at']} from {info['last_import']['source_file']}")
     return 0
@@ -197,6 +255,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", help="collect and validate only; write nothing")
     p.add_argument("--sources", nargs="+", choices=sorted(SOURCES), help="default: every enabled source")
     p.set_defaults(func=cmd_refresh)
+
+    p = sub.add_parser("find-internships", help="live internship finder: read job boards, publish, report coverage")
+    p.add_argument("--dry-run", action="store_true", help="read and report only; write nothing")
+    p.add_argument("--import", dest="import_now", action="store_true", help="also import into the real database")
+    p.add_argument("--output", default=str(config.REAL_INTERNSHIPS_FILE))
+    p.set_defaults(func=cmd_find_internships)
+
+    p = sub.add_parser("import-internships", help="import the published internship dataset into the real DB")
+    p.add_argument("--file", default=str(config.REAL_INTERNSHIPS_FILE))
+    p.set_defaults(func=cmd_import_internships)
 
     p = sub.add_parser("ai-check", help="test the AI assistant's provider with one tiny request")
     p.set_defaults(func=cmd_ai_check)

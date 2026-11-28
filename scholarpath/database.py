@@ -182,6 +182,116 @@ MIGRATIONS.append((
     """,
 ))
 
+MIGRATIONS.append((
+    4,
+    "internships: records, place and criteria lists, other listings, saved list, applications and history",
+    """
+    -- Internships live beside scholarships in the same database file (one file per dataset), in
+    -- their own tables, so saved items and applications can never mix between the two types.
+    -- Nothing that exists already is changed.
+    CREATE TABLE internships (
+        id                 TEXT PRIMARY KEY,
+        title              TEXT NOT NULL,
+        employer           TEXT NOT NULL,
+        location_text      TEXT NOT NULL DEFAULT '',
+        work_arrangement   TEXT NOT NULL CHECK (work_arrangement IN ('onsite','hybrid','remote','unknown')),
+        discipline_kind    TEXT NOT NULL CHECK (discipline_kind IN ('unrestricted','list','unknown')),
+        degree_kind        TEXT NOT NULL CHECK (degree_kind IN ('unrestricted','list','unknown')),
+        year_kind          TEXT NOT NULL CHECK (year_kind IN ('unrestricted','list','unknown')),
+        experience_text    TEXT NOT NULL DEFAULT '',
+        eligibility_text   TEXT NOT NULL DEFAULT '',
+        stipend_kind       TEXT NOT NULL CHECK (stipend_kind IN ('paid','paid_unstated','unpaid','unknown')),
+        stipend_min        INTEGER,
+        stipend_max        INTEGER,
+        stipend_text       TEXT NOT NULL DEFAULT '',
+        duration_months    REAL,
+        duration_text      TEXT NOT NULL DEFAULT '',
+        start_text         TEXT NOT NULL DEFAULT '',
+        deadline_kind      TEXT NOT NULL CHECK (deadline_kind IN ('dated','rolling','unknown')),
+        deadline_date      TEXT,
+        deadline_text      TEXT NOT NULL DEFAULT '',
+        deadline_at        TEXT,
+        deadline_timezone  TEXT,
+        closes_at          TEXT,
+        closed_by_source   INTEGER NOT NULL DEFAULT 0 CHECK (closed_by_source IN (0, 1)),
+        application_url    TEXT NOT NULL,
+        source_url         TEXT NOT NULL,
+        source_name        TEXT NOT NULL,
+        source_key         TEXT NOT NULL,
+        collected_at       TEXT NOT NULL,
+        source_fetched_at  TEXT,
+        fetch_method       TEXT NOT NULL,
+        manual_verified_at TEXT,
+        dataset_origin     TEXT NOT NULL CHECK (dataset_origin IN ('example','real_source')),
+        notes              TEXT NOT NULL DEFAULT '',
+        source_status      TEXT NOT NULL DEFAULT 'available',
+        content_hash       TEXT NOT NULL,
+        first_imported_at  TEXT NOT NULL,
+        last_imported_at   TEXT NOT NULL,
+        CHECK ((deadline_kind = 'dated') = (deadline_date IS NOT NULL))
+    );
+    CREATE INDEX idx_internships_closes ON internships (closes_at);
+    CREATE INDEX idx_internships_stipend ON internships (stipend_kind);
+
+    CREATE TABLE internship_cities (
+        internship_id TEXT NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
+        city          TEXT NOT NULL,
+        PRIMARY KEY (internship_id, city)
+    );
+    CREATE INDEX idx_internship_city ON internship_cities (city);
+    CREATE TABLE internship_states (
+        internship_id TEXT NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
+        state         TEXT NOT NULL,
+        PRIMARY KEY (internship_id, state)
+    );
+    CREATE INDEX idx_internship_state ON internship_states (state);
+    -- One table for the three criteria lists: field is 'discipline', 'degree' or 'year'.
+    CREATE TABLE internship_criteria (
+        internship_id TEXT NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
+        field         TEXT NOT NULL CHECK (field IN ('discipline','degree','year')),
+        value         TEXT NOT NULL,
+        PRIMARY KEY (internship_id, field, value)
+    );
+    -- The same internship found on another job board (kept when duplicates are merged).
+    CREATE TABLE internship_listings (
+        internship_id TEXT NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
+        position      INTEGER NOT NULL,
+        source_name   TEXT NOT NULL,
+        url           TEXT NOT NULL,
+        PRIMARY KEY (internship_id, position)
+    );
+
+    -- User data, the same shape as the scholarship tables. Internships referenced here are
+    -- never deleted (RESTRICT).
+    CREATE TABLE internship_saved (
+        internship_id TEXT PRIMARY KEY REFERENCES internships(id) ON DELETE RESTRICT,
+        added_at      TEXT NOT NULL
+    );
+    CREATE TABLE internship_applications (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        internship_id   TEXT NOT NULL UNIQUE REFERENCES internships(id) ON DELETE RESTRICT,
+        status          TEXT NOT NULL CHECK (status IN ('interested','preparing','applied','result_received')),
+        target_date     TEXT,
+        submitted_date  TEXT,
+        outcome         TEXT,
+        notes           TEXT NOT NULL DEFAULT '',
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+    );
+    CREATE TABLE internship_application_history (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        application_id INTEGER NOT NULL REFERENCES internship_applications(id) ON DELETE RESTRICT,
+        changed_at     TEXT NOT NULL,
+        status         TEXT NOT NULL,
+        target_date    TEXT,
+        submitted_date TEXT,
+        outcome        TEXT,
+        note           TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX idx_internship_history ON internship_application_history (application_id, changed_at);
+    """,
+))
+
 LATEST_VERSION = MIGRATIONS[-1][0]
 
 

@@ -171,3 +171,131 @@ def stable_id(source_name: str, source_key: str) -> str:
     """
     raw = f"{source_name.strip().lower()}|{source_key.strip()}".encode("utf-8")
     return "sp-" + hashlib.sha256(raw).hexdigest()[:16]
+
+
+# --- Internships (v2) -----------------------------------------------------------
+# An internship record uses the same deadline fields as a scholarship (deadline_kind,
+# deadline_date, deadline_at, deadline_timezone, closed_by_source), so dates.py, the
+# deadline badges and the closing rules work unchanged for both opportunity types.
+
+OPPORTUNITY_KINDS = ("scholarship", "internship")
+
+INTERN_DEGREES = {
+    "diploma": "Diploma",
+    "bachelor": "Bachelor's (B.E., B.Tech, B.Sc., B.Com, BBA, B.A. ...)",
+    "master": "Master's (M.Tech, M.Sc., MBA, M.A. ...)",
+    "phd": "PhD",
+}
+# Year of study the employer asks for. "final" and "graduate" are kept apart from the
+# numbered years: a final-year student is in year 3, 4 or 5 depending on the course.
+STUDY_YEARS = {
+    "1": "1st year", "2": "2nd year", "3": "3rd year", "4": "4th year", "5": "5th year",
+    "final": "Final year", "graduate": "Recent graduate",
+}
+DISCIPLINES = {
+    "engineering": "Engineering & software",
+    "data": "Data & analytics",
+    "design": "Design",
+    "product": "Product management",
+    "business": "Business & operations",
+    "finance": "Finance & accounting",
+    "marketing": "Marketing & content",
+    "research": "Research & science",
+    "people": "People & HR",
+    "legal": "Legal",
+}
+WORK_ARRANGEMENTS = {"onsite": "On-site", "hybrid": "Hybrid", "remote": "Remote", "unknown": "Not stated"}
+STIPEND_KINDS = {"paid": "Paid (amount stated)", "paid_unstated": "Paid (amount not stated)",
+                 "unpaid": "Unpaid", "unknown": "Not stated"}
+
+
+@dataclass
+class SourceLink:
+    """Where else the same internship is listed (kept when duplicates are merged)."""
+
+    source_name: str
+    url: str
+
+
+@dataclass
+class InternshipRecord:
+    id: str
+    title: str
+    employer: str
+    cities: list[str]                  # canonical city names (locations.canonical_city)
+    states: list[str]                  # states / union territories of those cities
+    location_text: str                 # the location as the source wrote it
+    work_arrangement: str              # WORK_ARRANGEMENTS
+    disciplines: Restriction           # DISCIPLINES; "unknown" when the role says nothing usable
+    degrees: Restriction               # INTERN_DEGREES
+    study_years: Restriction           # STUDY_YEARS
+    experience_text: str               # e.g. "No prior experience required"; "" when not stated
+    eligibility_text: str              # short facts only (never the employer's description text)
+    stipend_kind: str                  # STIPEND_KINDS
+    stipend_min: int | None            # rupees per month
+    stipend_max: int | None
+    stipend_text: str
+    duration_months: float | None
+    duration_text: str
+    deadline_kind: str
+    deadline_date: date | None
+    deadline_text: str
+    application_url: str
+    source_url: str
+    source_name: str
+    source_key: str
+    collected_at: str
+    source_fetched_at: str | None
+    fetch_method: str
+    manual_verified_at: str | None
+    dataset_origin: str
+    also_listed: list[SourceLink] = field(default_factory=list)
+    notes: str = ""
+    source_status: str = "available"
+    deadline_at: str | None = None
+    deadline_timezone: str | None = None
+    closed_by_source: bool = False
+    start_text: str = ""
+
+    # The shared screens show every opportunity as "title by provider". For an internship the
+    # role fills the title slot and the employer the provider slot.
+    @property
+    def name(self) -> str:
+        return self.title
+
+    @property
+    def provider(self) -> str:
+        return self.employer
+
+    @property
+    def requirements(self) -> list:
+        return []
+
+    @property
+    def manual_review_items(self) -> list:
+        return []
+
+    @property
+    def award_cycle(self) -> None:
+        return None
+
+    def to_dict(self) -> dict:
+        data = asdict(self)
+        data["deadline_date"] = self.deadline_date.isoformat() if self.deadline_date else None
+        return data
+
+
+def internship_id(employer: str, title: str, cities: list[str], arrangement: str) -> str:
+    """Stable identity of an internship across sources and refreshes.
+
+    The same role at the same employer in the same place is one internship, whichever job
+    board lists it, so a repeat refresh (or a second source) updates the record a student
+    saved instead of creating a new one. Descriptions, stipends and deadlines are not part
+    of the identity.
+    """
+    def norm(text: str) -> str:
+        return " ".join("".join(ch if ch.isalnum() else " " for ch in text.casefold()).split())
+
+    place = ",".join(sorted(norm(c) for c in cities)) or ("remote" if arrangement == "remote" else "india")
+    raw = f"internship|{norm(employer)}|{norm(title)}|{place}".encode("utf-8")
+    return "in-" + hashlib.sha256(raw).hexdigest()[:16]

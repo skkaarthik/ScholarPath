@@ -12,11 +12,12 @@ import os
 import streamlit as st
 
 from scholarpath import advisor, config
-from scholarpath.ui import (applications, chatbot, common, data_sources, find, insights, profile_match, review,
-                            saved, style)
+from scholarpath.ui import (applications, chatbot, choose, common, data_sources, find, insights, profile_match,
+                            review, saved, style)
 
 st.set_page_config(page_title="ScholarPath", page_icon=str(style.ASSETS / "icon.svg"), layout="wide")
 style.inject()
+common.restore_kind_from_url()   # a reload keeps the type chosen on the first screen
 common.keep_state()
 common.sync_published_data()   # a newly published real dataset is imported once, then cached reads reset
 
@@ -38,7 +39,8 @@ def _assistant_settings() -> bool:
 
 _assistant_settings()
 
-# The app follows one sequence: Find -> Review -> Apply -> Track.
+# The app follows one sequence: Find -> Review -> Apply -> Track, for internships and for
+# scholarships alike (the first screen asks which; the switch under the menu changes it).
 RENDERERS = {
     "find": find.render,                  # 1. search and results
     "review": review.render,              # 2. review a scholarship, 3. apply and confirm
@@ -62,9 +64,9 @@ def _page(slug: str) -> st.Page:
 def _menu_link(slug: str, active: bool, width: str = "content") -> None:
     """One menu entry. The container key ends in "_current" for the highlighted entry,
     which is what style.py uses to draw the lavender pill (st.page_link has no key of its own)."""
-    title, icon = common.PAGE_INFO[slug]
+    _, icon = common.PAGE_INFO[slug]
     with st.container(key=f"nav_{slug}" + ("_current" if active else ""), width=width):
-        st.page_link(PAGES[slug], label=title, icon=icon, width=width)
+        st.page_link(PAGES[slug], label=common.page_title(slug), icon=icon, width=width)
 
 
 def _menu(page: str) -> None:
@@ -80,11 +82,33 @@ def _menu(page: str) -> None:
             with st.popover("More", icon=":material/more_horiz:", type="tertiary", key=f"nav_more_menu_{page}"):
                 for slug in common.MORE_PAGES:
                     _menu_link(slug, page == slug, width="stretch")   # full-width rows inside the menu
+                # The type switch is also in this menu, so it is one tap away on a phone as well.
+                other = common.words()["other"]
+                with st.container(key="nav_switch_kind", width="stretch"):
+                    st.button(common.words()["switch_label"], key=f"nav_switch_{page}", on_click=common.switch_kind,
+                              args=(other,), icon=":material/swap_horiz:", type="tertiary", width="stretch")
+
+
+def _kind_bar() -> None:
+    """Which opportunity type is showing, as a labelled two-way switch just under the menu
+    (on every screen size; on phones it sits at the top of the page, above the content)."""
+    st.session_state["kind_pick"] = common.current_kind()
+    with st.container(key="kind_bar", horizontal=True, vertical_alignment="center", gap="small"):
+        st.segmented_control("Looking for", list(common.KIND_LABELS), format_func=common.KIND_LABELS.get,
+                             key="kind_pick", on_change=common.on_kind_segment, label_visibility="visible",
+                             help="Internships and scholarships each keep their own search, Saved list and "
+                                  "Applications.")
 
 
 PAGES = {slug: _page(slug) for slug in RENDERERS}
 # Streamlit only does the routing (position="hidden"); _menu() draws the menu itself.
 current = st.navigation(list(PAGES.values()), position="hidden")
+
+# First visit: the only new screen. Nothing else is drawn until the student chooses.
+if common.current_kind() is None:
+    choose.render()
+    st.stop()
+common.remember_kind_in_url()
 
 # Buttons ask for another page through common.go_to(); the switch happens here.
 target = st.session_state.pop("_goto", None)
@@ -98,8 +122,11 @@ with st.sidebar:
     st.radio("Dataset", list(config.MODES), format_func=config.MODE_LABELS.get, key="mode",
              on_change=common.on_mode_change,
              help="Each dataset has its own database, saved list and tracker. Nothing is shared between them.")
+    st.button(common.words()["switch_label"], key="sidebar_switch_kind", on_click=common.switch_kind,
+              args=(common.words()["other"],), icon=":material/swap_horiz:")
     st.caption("Runs only on this computer. ScholarPath never submits anything to a scholarship provider.")
 
 _menu(page)
+_kind_bar()
 chatbot.entry(page)       # "Ask ScholarPath": the assistant panel, available on every page
 current.run()

@@ -1,0 +1,85 @@
+[
+ {
+  "id": "cf014ef0-218a-4041-a238-ff91c7b9a5bc",
+  "text": "Backend Engineering Intern",
+  "country": "IN",
+  "workplaceType": "onsite",
+  "categories": {
+   "location": "Bengaluru",
+   "team": "Engineering",
+   "commitment": "Intern",
+   "allLocations": [
+    "Bengaluru"
+   ]
+  },
+  "hostedUrl": "https://jobs.lever.co/fampay/cf014ef0-218a-4041-a238-ff91c7b9a5bc",
+  "applyUrl": "https://jobs.lever.co/fampay/cf014ef0-218a-4041-a238-ff91c7b9a5bc/apply",
+  "createdAt": 1763700000000,
+  "descriptionPlain": "Competitive stipend for the internship period. Pre-final or final year students.",
+  "lists": [
+   {
+    "text": "Requirements",
+    "content": "<li>B.Tech in CS</li>"
+   }
+  ],
+  "additionalPlain": ""
+ },
+ {
+  "id": "a7e3ad38-e09a-4d2a-8b6f-83d74a6c122c",
+  "text": "People Operations Associate",
+  "country": "IN",
+  "workplaceType": "onsite",
+  "categories": {
+   "location": "Bangalore",
+   "team": "People",
+   "commitment": "Intern"
+  },
+  "hostedUrl": "https://jobs.lever.co/fampay/a7e3ad38-e09a-4d2a-8b6f-83d74a6c122c",
+  "descriptionPlain": "Unpaid internship for 2 months.",
+  "lists": []
+ },
+ {
+  "id": "x-remote",
+  "text": "Data Analyst Intern",
+  "country": "IN",
+  "workplaceType": "remote",
+  "categories": {
+   "location": "Remote - India",
+   "team": "Data",
+   "commitment": "Intern"
+  },
+  "hostedUrl": "https://jobs.lever.co/fampay/x-remote",
+  "descriptionPlain": "",
+  "lists": [],
+  "salaryRange": {
+   "currency": "INR",
+   "interval": "per-month-salary",
+   "min": 25000,
+   "max": 30000
+  }
+ },
+ {
+  "id": "x-sg",
+  "text": "Marketing Intern",
+  "country": "SG",
+  "workplaceType": "onsite",
+  "categories": {
+   "location": "Singapore",
+   "commitment": "Intern"
+  },
+  "hostedUrl": "https://jobs.lever.co/fampay/x-sg",
+  "lists": []
+ },
+ {
+  "id": "x-full",
+  "text": "Backend Engineer",
+  "country": "IN",
+  "workplaceType": "onsite",
+  "categories": {
+   "location": "Bengaluru",
+   "commitment": "Full-time"
+  },
+  "hostedUrl": "https://jobs.lever.co/fampay/x-full",
+  "lists": []
+ }
+]

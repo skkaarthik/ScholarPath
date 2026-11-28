@@ -1,0 +1,81 @@
+{
+ "jobs": [
+  {
+   "id": 8073933,
+   "title": "Product Support - Intern",
+   "company_name": "FourKites",
+   "location": {
+    "name": "Chennai, India"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/fourkites/jobs/8073933",
+   "updated_at": "2026-11-20T10:00:00-05:00",
+   "first_published": "2026-08-05T10:00:00-05:00",
+   "application_deadline": null,
+   "departments": [
+    {
+     "name": "Product Support"
+    }
+   ],
+   "offices": [
+    {
+     "name": "Chennai"
+    }
+   ],
+   "content": "&lt;p&gt;This internship is for a 6-month tenure.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;6 months Internship with the Product support Team, during which a Stipend amount of INR 20,000 per month will be offered&lt;/li&gt;&lt;li&gt;Final-year B.E./B.Tech students; no prior experience required.&lt;/li&gt;&lt;/ul&gt;"
+  },
+  {
+   "id": 8073934,
+   "title": "Software Engineering Intern",
+   "company_name": "FourKites",
+   "location": {
+    "name": "Bangalore, Karnataka, India"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/fourkites/jobs/8073934",
+   "updated_at": "2026-11-20T10:00:00-05:00",
+   "application_deadline": "2026-12-15",
+   "departments": [
+    {
+     "name": "Engineering"
+    }
+   ],
+   "offices": [],
+   "content": "&lt;p&gt;Hybrid role. Duration: 3 months.&lt;/p&gt;"
+  },
+  {
+   "id": 8073935,
+   "title": "Senior AI Engineer",
+   "company_name": "FourKites",
+   "location": {
+    "name": "Chennai or Remote, India"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/fourkites/jobs/8073935",
+   "updated_at": "2026-11-20T10:00:00-05:00",
+   "content": ""
+  },
+  {
+   "id": 8073936,
+   "title": "Data Intern",
+   "company_name": "FourKites",
+   "location": {
+    "name": "Chicago, IL"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/fourkites/jobs/8073936",
+   "updated_at": "2026-11-20T10:00:00-05:00",
+   "content": ""
+  },
+  {
+   "id": 8073937,
+   "title": "Internal Auditor",
+   "company_name": "FourKites",
+   "location": {
+    "name": "Chennai, India"
+   },
+   "absolute_url": "https://job-boards.greenhouse.io/fourkites/jobs/8073937",
+   "updated_at": "2026-11-20T10:00:00-05:00",
+   "content": ""
+  }
+ ],
+ "meta": {
+  "total": 5
+ }
+}

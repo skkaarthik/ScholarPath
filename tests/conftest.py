@@ -27,6 +27,7 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("SCHOLARPATH_TODAY", FIXED_TODAY.isoformat())
     # The app imports the published real dataset on start; tests get an empty, temporary one.
     monkeypatch.setattr(config, "REAL_DATASET_FILE", tmp_path / "published" / "real_scholarships.json")
+    monkeypatch.setattr(config, "REAL_INTERNSHIPS_FILE", tmp_path / "published" / "real_internships.json")
     from scholarpath import refresh
 
     monkeypatch.setattr(refresh, "STATE_FILE", tmp_path / "published" / "state.json")

@@ -1,4 +1,8 @@
-"""Review a scholarship (step 2) and apply (step 3).
+"""Review a scholarship or an internship (step 2) and apply (step 3).
+
+v2: one page for both types. The layout, the Apply states and every button are shared; only
+the facts differ (an internship shows place, work arrangement, stipend, duration, degree,
+year of study and experience where a scholarship shows country, funding and citizenship).
 
 Reading order: title and provider, the four facts a student needs first
 (deadline, who can apply, where, funding), then Apply, then the detailed
@@ -21,7 +25,7 @@ import streamlit as st
 
 from .. import config
 from ..dates import describe_deadline
-from ..models import SCORE_SCALES
+from ..models import SCORE_SCALES, InternshipRecord
 from ..services import STORAGE_ERRORS, ServiceError
 from . import common
 
@@ -79,6 +83,21 @@ def _fact(column, label: str, lines: list[str]) -> None:
     column.markdown(f"**{label}**  \n" + "  \n".join(lines))
 
 
+def _who_can_apply_internship(rec) -> list[str]:
+    lines = []
+    if rec.degrees.kind == "list":
+        lines.append(common.intern_degree_text(rec))
+    elif rec.degrees.kind == "unrestricted":
+        lines.append("Any degree")
+    if rec.study_years.kind == "list":
+        lines.append(common.year_text(rec))
+    elif rec.study_years.kind == "unrestricted":
+        lines.append("Any year of study")
+    if rec.disciplines.kind == "list":
+        lines.append(common.discipline_text(rec))
+    return lines or ["Degree and year not recorded"]
+
+
 def _at_a_glance(view) -> None:
     """The four facts to read first. Columns stack on a phone."""
     rec = view.record
@@ -86,6 +105,13 @@ def _at_a_glance(view) -> None:
     with st.container(border=True, key="card_glance"):
         deadline, who, where, funding = st.columns(4, gap="medium")
         _fact(deadline, "Deadline", [common.badge(colour, label)] + ([detail] if detail else []))
+        if isinstance(rec, InternshipRecord):
+            _fact(who, "Who can apply", [common.md_escape(line) for line in _who_can_apply_internship(rec)])
+            _fact(where, "Where", [common.md_escape(common.internship_place(rec)),
+                                   common.md_escape(common.arrangement_text(rec))])
+            _fact(funding, "Stipend", [common.md_escape(common.stipend_text(rec)),
+                                       common.md_escape(common.duration_text(rec))])
+            return
         _fact(who, "Who can apply", [common.md_escape(line) for line in _who_can_apply(rec)])
         _fact(where, "Where", [common.md_escape(", ".join(rec.host_countries)),
                                common.md_escape(common.level_text(rec) or "Level not recorded")])
@@ -114,8 +140,9 @@ def _confirm_card(svc, rec, today) -> None:
     """Step shown after "Mark as applied": the date, then a clear yes or a cancel."""
     with st.container(border=True, key="card_confirm"):
         st.subheader("Confirm your submission", anchor=False)
-        st.markdown("Confirm only after you have submitted the application on the provider's website. "
-                    "ScholarPath does not send anything to the provider.")
+        provider = common.WORDS[svc.kind]["provider"]
+        st.markdown(f"Confirm only after you have submitted the application on the {provider}'s website. "
+                    f"ScholarPath does not send anything to the {provider}.")
         # No max_value on purpose: the field would then refuse a later date in the browser but still
         # send its previous value, so a click on "Yes" could record a date the user never chose.
         # The date is checked here as soon as it changes, and again by the service when confirming.
@@ -135,6 +162,8 @@ def _confirm_card(svc, rec, today) -> None:
 
 def _apply(svc, view, today) -> None:
     rec = view.record
+    w = common.WORDS[svc.kind]
+    site = "employer" if svc.kind == config.KIND_INTERNSHIP else "provider"
     app = svc.get_application(rec.id)
     st.header("Apply", anchor=False)
     common.flash()
@@ -147,7 +176,7 @@ def _apply(svc, view, today) -> None:
         with st.container(horizontal=True, key="apply_actions"):
             st.button("View application", key="r_view_app", on_click=common.open_application, args=(rec.id,),
                       type="primary", icon=":material/arrow_forward:", icon_position="right")
-            common.safe_link_button("Provider site", rec.application_url, key="r_apply",
+            common.safe_link_button(f"{site.capitalize()} site", rec.application_url, key="r_apply",
                                     icon=":material/open_in_new:", icon_position="right")
         return
 
@@ -159,11 +188,12 @@ def _apply(svc, view, today) -> None:
     # State 1: not applied yet. One main action: go to the provider's website.
     closed = view.status == "expired"
     if closed:
-        st.info(f"The published deadline has passed ({common.fmt_date(rec.deadline_date)}). You can still open "
-                "the provider's website, or record an application you sent before it closed.",
-                icon=":material/event_busy:")
+        passed = (f"The published deadline has passed ({common.fmt_date(rec.deadline_date)})." if rec.deadline_date
+                  else f"The {w['provider']}'s page no longer lists this {w['noun']}.")
+        st.info(f"{passed} You can still open the {w['provider']}'s website, or record an application you sent "
+                "before it closed.", icon=":material/event_busy:")
     with st.container(horizontal=True, key="apply_actions"):
-        linked = common.safe_link_button("Apply on provider site", rec.application_url, key="r_apply",
+        linked = common.safe_link_button(f"Apply on {site} site", rec.application_url, key="r_apply",
                                          type="secondary" if closed else "primary",
                                          icon=":material/open_in_new:", icon_position="right")
         st.button("Mark as applied", key="r_mark", on_click=_ask_to_confirm, args=(rec.id,),
@@ -173,8 +203,8 @@ def _apply(svc, view, today) -> None:
                    "new tab. ScholarPath never submits anything for you: after you apply there, come back "
                    "and choose Mark as applied.")
     else:
-        st.caption("No usable application link was collected for this scholarship, so look it up on the "
-                   "provider's website. After you apply, come back and choose Mark as applied.")
+        st.caption(f"No usable application link was collected for this {w['noun']}, so look it up on the "
+                   f"{w['provider']}'s website. After you apply, come back and choose Mark as applied.")
     if svc.mode == config.MODE_EXAMPLE:
         st.caption("Example data: the link opens a placeholder page, not a real application form.")
     if app:  # an earlier Interested/Preparing entry made before the redesign
@@ -210,6 +240,45 @@ def _eligibility(rec) -> None:
         st.markdown(common.md_escape(rec.eligibility_text) or "No eligibility text was collected.")
 
 
+def _eligibility_internship(rec) -> None:
+    st.header("Eligibility", anchor=False)
+    rows = [
+        ("Degree", common.intern_degree_text(rec)),
+        ("Year of study", common.year_text(rec)),
+        ("Discipline", common.discipline_text(rec)),
+        ("Experience", rec.experience_text or "Not stated"),
+    ]
+    st.markdown("\n".join(f"- **{label}:** {common.md_escape(value)}" for label, value in rows))
+    st.caption("\"Not listed in a structured form\" means ScholarPath could not record the rule, not that "
+               "there is none. The discipline is ScholarPath's reading of the role title and team.")
+    st.subheader("Confirm on the employer's page (1)", anchor=False)
+    st.markdown("Part of what the employer asks for, but ScholarPath can't check it for you.")
+    st.markdown("- Skills, documents and any other conditions in the full posting")
+    with st.expander("Facts recorded from the posting", key="r_wording", icon=":material/format_quote:"):
+        st.caption("ScholarPath keeps facts only, not the employer's description text. Read the full posting on "
+                   "the employer's page.")
+        st.markdown(common.md_escape(rec.eligibility_text) or "No eligibility facts were stated in the posting.")
+
+
+def _deadline_and_stipend(view, today) -> None:
+    rec = view.record
+    st.header("Deadline", anchor=False)
+    st.markdown(f"**{describe_deadline(rec.deadline_kind, rec.deadline_date, today, view.status == 'expired')}**")
+    if rec.deadline_text.strip():
+        st.markdown(f"Employer's wording: “{common.md_escape(rec.deadline_text.strip())}”")
+    if view.status == "unknown":
+        st.markdown("Most job boards do not publish a closing date: postings usually close when the role is "
+                    "filled. ScholarPath never guesses one, so apply early and check the employer's page.")
+    if view.status in ("open", "expired") and rec.deadline_date:
+        st.caption(f"A date-only deadline counts as open until the end of that day ({config.APP_TIMEZONE_NAME}).")
+    st.header("Stipend and duration", anchor=False)
+    st.markdown(f"**{common.stipend_text(rec)}**")
+    st.markdown(common.md_escape(rec.stipend_text) if rec.stipend_text else "The posting does not state a stipend.")
+    st.markdown(f"**Duration:** {common.md_escape(common.duration_text(rec))}")
+    if rec.start_text:
+        st.markdown(f"**Start:** {common.md_escape(rec.start_text)}")
+
+
 def _deadline_and_funding(view, today) -> None:
     rec = view.record
     st.header("Deadline", anchor=False)
@@ -237,20 +306,27 @@ def _deadline_and_funding(view, today) -> None:
 
 
 def _source(rec) -> None:
+    internship = isinstance(rec, InternshipRecord)
     with st.expander("Source and freshness", key="r_source", icon=":material/info:"):
         st.markdown(
             f"- **Source:** {common.md_escape(rec.source_name)}\n"
             f"- **How it was collected:** "
             f"{common.FETCH_LABELS.get(rec.fetch_method, common.md_escape(rec.fetch_method))}\n"
-            f"- **Source page read:** "
+            f"- **{'Last checked' if internship else 'Source page read'}:** "
             f"{common.fmt_ts(rec.source_fetched_at) if rec.source_fetched_at else 'Not applicable'}\n"
             f"- **Record created:** {common.fmt_ts(rec.collected_at)}\n"
             f"- **Checked by a person:** "
             f"{common.fmt_ts(rec.manual_verified_at) if rec.manual_verified_at else 'Not yet'}"
         )
         if rec.source_status == "unavailable":
-            st.markdown("The source page could not be reached at the last collection, so this saved copy "
-                        "may be out of date.")
+            st.markdown("The job board no longer listed this posting at the last check, so it is shown as closed."
+                        if internship else "The source page could not be reached at the last collection, so this "
+                        "saved copy may be out of date.")
+        if internship and rec.also_listed:
+            st.markdown("**Also listed on:**")
+            for i, link in enumerate(rec.also_listed):
+                common.safe_link_button(link.source_name, link.url, key=f"r_also_{i}", icon=":material/open_in_new:",
+                                        icon_position="right", type="tertiary")
         if rec.notes:
             st.caption(common.md_escape(rec.notes))
         if not common.safe_link_button("Open source page", rec.source_url, key="r_source_link",
@@ -272,15 +348,16 @@ def render(svc) -> None:
             common.dataset_ready(svc)     # shows the set-up steps
         return
     if view is None:
-        common.page_header(svc, "Review scholarship")
+        w = common.WORDS[svc.kind]
+        common.page_header(svc, f"Review {w['noun']}")
         if sid:   # an ID that is no longer in this dataset (for example after a new import)
-            common.empty_state("review_missing", "This scholarship is not in this dataset",
-                               "It may have been removed by a later import. Choose a scholarship again "
-                               "from Find Scholarships.", "Find scholarships", "find", icon=":material/search:")
+            common.empty_state("review_missing", f"This {w['noun']} is not in this dataset",
+                               f"It may have been removed by a later import. Choose {w['a']} again "
+                               f"from {w['find']}.", w["find_button"], "find", icon=":material/search:")
         else:
-            common.empty_state("review", "No scholarship selected",
-                               "Choose a scholarship from Find Scholarships or your Saved list to review it here.",
-                               "Find scholarships", "find", icon=":material/search:")
+            common.empty_state("review", f"No {w['noun']} selected",
+                               f"Choose {w['a']} from {w['find']} or your Saved list to review it here.",
+                               w["find_button"], "find", icon=":material/search:")
         return
     rec = view.record
     today = svc.today()
@@ -292,6 +369,10 @@ def render(svc) -> None:
         st.caption(common.freshness_text(rec, today))
     _at_a_glance(view)
     _apply(svc, view, today)
-    _eligibility(rec)
-    _deadline_and_funding(view, today)
+    if isinstance(rec, InternshipRecord):
+        _eligibility_internship(rec)
+        _deadline_and_stipend(view, today)
+    else:
+        _eligibility(rec)
+        _deadline_and_funding(view, today)
     _source(rec)

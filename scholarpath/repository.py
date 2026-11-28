@@ -242,9 +242,12 @@ def record_import_run(conn: sqlite3.Connection, run: dict) -> None:
     )
 
 
-def latest_import_run(conn: sqlite3.Connection) -> sqlite3.Row | None:
+def latest_import_run(conn: sqlite3.Connection, internships: bool = False) -> sqlite3.Row | None:
+    """The latest successful import of scholarships (default) or of internships. Both types log to
+    import_runs; internship imports are the runs whose source_file starts with "internships:"."""
+    test = "LIKE 'internships:%'" if internships else "NOT LIKE 'internships:%'"
     return conn.execute(
-        "SELECT * FROM import_runs WHERE status = 'success' ORDER BY id DESC LIMIT 1"
+        f"SELECT * FROM import_runs WHERE status = 'success' AND source_file {test} ORDER BY id DESC LIMIT 1"
     ).fetchone()
 
 

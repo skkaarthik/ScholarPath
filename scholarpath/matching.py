@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .models import DEGREES, SCORE_SCALES, SUBJECTS, ScholarshipRecord
+from .models import DEGREES, DISCIPLINES, INTERN_DEGREES, SCORE_SCALES, STUDY_YEARS, SUBJECTS, ScholarshipRecord
 
 SATISFIED, FAILED, UNKNOWN = "satisfied", "failed", "unknown"
 
@@ -220,4 +220,64 @@ def evaluate(profile: StudentProfile, rec: ScholarshipRecord) -> MatchResult:
         overall = OVERALL_MANUAL
     else:
         overall = OVERALL_MATCH
+    return MatchResult(rec.id, overall, rules)
+
+
+# --- internships (same verdicts, same grouping, same honesty rules) -----------------------
+
+@dataclass
+class InternshipProfile:
+    degree: str | None = None            # INTERN_DEGREES
+    year: str | None = None              # "1".."5" or "graduate"
+    final_year: bool = False             # the student's current year is the last of the course
+    discipline: str | None = None        # DISCIPLINES
+    preferred_place: str | None = None   # a city, "remote" or None; narrows the list only
+
+
+def validate_internship_profile(profile: InternshipProfile) -> list[str]:
+    errors = []
+    if profile.degree and profile.degree not in INTERN_DEGREES:
+        errors.append("Unknown degree.")
+    if profile.year and profile.year not in STUDY_YEARS:
+        errors.append("Unknown year of study.")
+    if profile.final_year and profile.year == "graduate":
+        errors.append("A recent graduate is not in a final year. Choose one or the other.")
+    if profile.final_year and not profile.year:
+        errors.append("Choose your year of study as well, or untick final year.")
+    if profile.discipline and profile.discipline not in DISCIPLINES:
+        errors.append("Unknown discipline.")
+    return errors
+
+
+def rule_study_year(profile: InternshipProfile, req) -> RuleResult:
+    """Numbered years, "final year" and "recent graduate" are compared without guessing course length:
+    a 3rd-year student meets "final year" only when they said this is their final year."""
+    shown = {"unrestricted": "Any year (stated)", "unknown": "Not recorded in structured form"}.get(
+        req.kind, ", ".join(STUDY_YEARS.get(v, v) for v in req.values))
+    if not profile.year:
+        return RuleResult("Year of study", "(not provided)", shown, UNKNOWN,
+                          "You didn't choose a year of study, so this can't be checked.", missing_input=True)
+    student = STUDY_YEARS[profile.year] + (" (final year)" if profile.final_year else "")
+    if req.kind == "unknown":
+        return RuleResult("Year of study", student, shown, UNKNOWN,
+                          "The employer doesn't state a year of study in a form ScholarPath can check.")
+    if req.kind == "unrestricted" or profile.year in req.values or (profile.final_year and "final" in req.values):
+        return RuleResult("Year of study", student, shown, SATISFIED, f"{student} is accepted.")
+    return RuleResult("Year of study", student, shown, FAILED, f"{student} is not one of the years asked for.")
+
+
+def evaluate_internship(profile: InternshipProfile, rec) -> MatchResult:
+    rules = [
+        _list_rule("Degree", profile.degree, rec.degrees, INTERN_DEGREES),
+        rule_study_year(profile, rec.study_years),
+        _list_rule("Discipline", profile.discipline, rec.disciplines, DISCIPLINES),
+    ]
+    if rec.experience_text:
+        rules.append(RuleResult("Manual review (experience)", "-", rec.experience_text, UNKNOWN,
+                                "Confirm this yourself on the employer's page.", kind="manual"))
+    rules.append(RuleResult("Manual review (full requirements)", "-",
+                            "Skills, documents and other conditions in the employer's posting", UNKNOWN,
+                            "ScholarPath keeps facts only; read the full posting before applying.", kind="manual"))
+    statuses = {r.status for r in rules}
+    overall = OVERALL_FAIL if FAILED in statuses else OVERALL_MANUAL if UNKNOWN in statuses else OVERALL_MATCH
     return MatchResult(rec.id, overall, rules)

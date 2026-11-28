@@ -24,6 +24,15 @@ EXAMPLE_TEMPLATE = EXAMPLES_DIR / "example_scholarships.template.json"
 EXAMPLE_BUILD_DIR = EXAMPLES_DIR / "build"
 COLLECTED_DIR = DATA_DIR / "collected"
 REAL_DATASET_FILE = COLLECTED_DIR / "real_scholarships.json"
+# v2: internships. The live finder writes this file; the app imports it once per version.
+REAL_INTERNSHIPS_FILE = COLLECTED_DIR / "real_internships.json"
+EXAMPLE_INTERNSHIP_TEMPLATE = EXAMPLES_DIR / "example_internships.template.json"
+
+# Opportunity types (v2). Not to be confused with the dataset MODES below: every dataset
+# holds both types, each with its own saved list and applications.
+KIND_SCHOLARSHIP = "scholarship"
+KIND_INTERNSHIP = "internship"
+KINDS = (KIND_INTERNSHIP, KIND_SCHOLARSHIP)
 SNAPSHOT_DIR = DATA_DIR / "snapshots"
 
 APP_TIMEZONE_NAME = os.environ.get("SCHOLARPATH_TIMEZONE", "Asia/Kolkata")

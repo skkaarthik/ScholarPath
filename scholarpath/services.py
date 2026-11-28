@@ -528,3 +528,214 @@ class ScholarPathService:
                  "Does not match recorded requirements": 2}
         results = [(v, evaluate(profile, v.record)) for v in views]
         return sorted(results, key=lambda pair: (order[pair[1].overall], pair[0].record.name, pair[0].record.id))
+
+
+# --- internships (v2) ---------------------------------------------------------------
+
+class InternshipService(ScholarPathService):
+    """The same service for internships: one dataset mode, one database file, the same
+    short-lived connections and transactions. Saving, Mark as applied, status updates,
+    removal and history are inherited unchanged; only reading and importing records differ.
+    """
+
+    kind = "internship"
+    T = repo.INTERNSHIP_TABLES
+    noun = "internship"
+
+    @staticmethod
+    def _load(conn, ids: list[str]) -> list:
+        return repo.load_internships(conn, ids)
+
+    # --- imports ------------------------------------------------------------------
+
+    def import_file(self, path: Path) -> ImportReport:
+        path = Path(path)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ImportFailed(f"Could not read {path}: {exc}") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("records"), list):
+            raise ImportFailed(f"{path} has no 'records' list")
+        return self.import_payload(payload, source_file=str(path))
+
+    def import_payload(self, payload: dict, source_file: str = "<memory>", meta: dict | None = None) -> ImportReport:
+        meta = dict(meta or {})
+        if payload.get("sources") is not None:
+            meta["internship_sources"] = json.dumps(payload["sources"], sort_keys=True)
+        if payload.get("example_anchor_date"):
+            meta["example_anchor_date"] = payload["example_anchor_date"]
+        read_ok = [s["source_name"] for s in payload.get("sources") or [] if s.get("status") == "ok"]
+        return self.import_records(payload["records"], source_file=source_file, meta=meta, sources_read=read_ok)
+
+    def import_records(self, raw_records: list, source_file: str = "<memory>", unavailable_urls=None,
+                       meta: dict | None = None, sources_read: list[str] | None = None) -> ImportReport:
+        """Validate first, then write every valid record in ONE transaction (rolled back on any error).
+
+        ``sources_read`` names the job boards read successfully in this collection: their postings
+        that are no longer listed are marked closed (never deleted). Records of a source that
+        failed are left exactly as they were.
+        """
+        from .cleaning import validate_many_internships
+
+        self.ensure_schema()
+        started = config.utc_now_iso()
+        report = ImportReport(source_file=f"internships:{source_file}")
+        valid, rejected, duplicates = validate_many_internships(raw_records)
+        expected = MODE_TO_ORIGIN[self.mode]
+        accepted = []
+        for rec in valid:
+            if rec.dataset_origin != expected:
+                rejected.append({"name": rec.title, "reasons": [
+                    f"dataset_origin {rec.dataset_origin!r} cannot be imported into the {self.mode!r} database"]})
+            else:
+                accepted.append(rec)
+        report.rejected, report.duplicates = rejected, duplicates
+        if not accepted:
+            self._log_run(started, report, "failed", "No valid internship records; nothing imported.")
+            raise ImportFailed(f"No valid internship records in {source_file}; nothing was changed. "
+                               f"First rejection: {rejected[:1]}")
+        now = config.utc_now_iso()
+        try:
+            with connect(self.db_path) as conn, transaction(conn):
+                for rec in accepted:
+                    digest = content_hash(rec)
+                    existing = repo.internship_state(conn, rec.id)
+                    if existing is None:
+                        repo.insert_internship(conn, rec, digest, now)
+                        report.inserted += 1
+                    elif existing["content_hash"] != digest:
+                        repo.update_internship(conn, rec, digest, now)
+                        report.updated += 1
+                    else:
+                        repo.touch_internship(conn, rec, now)
+                        report.unchanged += 1
+                seen = {rec.id for rec in accepted}
+                for source_name in sources_read or []:
+                    report.marked_unavailable += repo.close_missing_internships(conn, source_name, seen)
+                for key, value in meta.items():
+                    repo.set_meta(conn, key, value)
+                repo.set_meta(conn, "internships_last_import_at", now)
+                self._insert_run(conn, started, report, "success", "")
+        except Exception as exc:
+            self._log_run(started, report, "failed", f"Rolled back: {exc}")
+            raise ImportFailed(f"Import rolled back, database unchanged: {exc}") from exc
+        return report
+
+    def imported_version(self) -> str | None:
+        if not self.database_exists():
+            return None
+        self.ensure_schema()
+        with connect(self.db_path) as conn:
+            return repo.get_meta(conn, "internships_published_version")
+
+    def sync_published(self, path: Path = config.REAL_INTERNSHIPS_FILE) -> str:
+        """Import the live finder's latest dataset once per version (Real dataset only).
+        Returns "imported", "current" or "missing"; saved items and applications are untouched."""
+        if self.mode != config.MODE_REAL or not Path(path).exists():
+            return "missing"
+        try:
+            payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ImportFailed(f"Could not read {path}: {exc}") from exc
+        version = payload.get("dataset_version")
+        if not version:
+            raise ImportFailed(f"{path} has no dataset_version")
+        if self.imported_version() == version:
+            return "current"
+        self.import_payload(payload, source_file=str(path), meta={"internships_published_version": version})
+        return "imported"
+
+    # --- reads --------------------------------------------------------------------
+
+    def search(self, filters: "repo.InternshipFilters | None" = None, sort: str = "deadline") -> list[ScholarshipView]:
+        today = self.today()
+        with connect(self.db_path) as conn:
+            ids = repo.search_internship_ids(conn, filters or repo.InternshipFilters(), sort, self.now_iso())
+            return [self._view(r, today) for r in repo.load_internships(conn, ids)]
+
+    def filter_options(self) -> dict[str, list[str]]:
+        from .locations import order_places, order_states
+
+        with connect(self.db_path) as conn:
+            values = repo.internship_values(conn)
+        return {"cities": order_places(values["cities"]), "states": order_states(values["states"])}
+
+    def overview(self) -> dict:
+        with connect(self.db_path) as conn:
+            fresh = repo.internship_freshness(conn)
+            run = repo.latest_import_run(conn, internships=True)
+            sources = repo.get_meta(conn, "internship_sources")
+            return {
+                "scholarships": repo.count_internships(conn),        # key shared with the scholarship overview
+                "active": repo.count_active_internships(conn, self.now_iso()),
+                "saved": len(repo.shortlist_ids(conn, t=self.T)),
+                "tracked": len(repo.application_list(conn, t=self.T)),
+                "oldest_collected": fresh["oldest_collected"], "newest_collected": fresh["newest_collected"],
+                "oldest_fetched": fresh["oldest_fetched"], "newest_fetched": fresh["newest_fetched"],
+                "verified_count": fresh["verified_count"] or 0,
+                "unavailable_count": fresh["unavailable_count"] or 0,
+                "last_import": dict(run) if run else None,
+                "example_anchor_date": repo.get_meta(conn, "example_anchor_date"),
+                "sources": json.loads(sources) if sources else [],
+            }
+
+    def coverage(self) -> dict[str, int]:
+        """Open internships in Chennai, in Bengaluru, elsewhere in India and remote (for Data & sources
+        and the live-finder report). One internship in two cities counts in each."""
+        views = self.search()
+        chennai = sum(1 for v in views if "Chennai" in v.record.cities)
+        bengaluru = sum(1 for v in views if "Bengaluru" in v.record.cities)
+        elsewhere = sum(1 for v in views if any(c not in ("Chennai", "Bengaluru") for c in v.record.cities)
+                        or (not v.record.cities and v.record.work_arrangement != "remote"))
+        remote = sum(1 for v in views if v.record.work_arrangement == "remote")
+        return {"open": len(views), "chennai": chennai, "bengaluru": bengaluru, "rest_of_india": elsewhere,
+                "remote": remote}
+
+    # --- Check my fit ------------------------------------------------------------------
+
+    def match(self, profile, filters=None):
+        from .matching import evaluate_internship
+
+        filters = filters or repo.InternshipFilters()
+        place = profile.preferred_place
+        if place == "remote":
+            filters = replace(filters, place="remote")
+        elif place:
+            filters = replace(filters, cities=[place])
+        views = self.search(filters, sort="name")
+        order = {"Matches recorded requirements": 0, "Needs manual verification": 1,
+                 "Does not match recorded requirements": 2}
+        results = [(v, evaluate_internship(profile, v.record)) for v in views]
+        return sorted(results, key=lambda pair: (order[pair[1].overall], pair[0].record.name, pair[0].record.id))
+
+    # --- assistant -------------------------------------------------------------------------
+
+    def chat(self, question: str, history: list[tuple[str, str]], current_id: str | None = None,
+             profile=None) -> advisor.ChatReply:
+        """The same read-only assistant, answering from internship records only."""
+        question = advisor.check_question(question)
+        today = self.today()
+        views = self.search(sort="deadline")
+        if current_id and current_id not in {v.record.id for v in views}:
+            current = self.get(current_id)
+            views = views + ([current] if current else [])
+        chat = chat_context.select(views, question, history, current_id, profile, self.applications())
+        names = [c.view.record.name for c in chat.records]
+        settings = advisor.settings_from_env()
+        if settings is None:
+            shown = chat.records[:1] if chat.current_tag else chat.records[:3]
+            if chat.intent == "progress":
+                shown = [c for c in chat.records if any(a["tag"] == c.tag for a in chat.applications or [])]
+            return advisor.ChatReply(advisor.demo_answer(chat, today, kind=self.kind), shown, demo=True,
+                                     context_names=names)
+        context = chat_context.context_block(chat, today, profile, config.MODE_LABELS.get(self.mode, self.mode),
+                                             kind=self.kind)
+        raw = advisor.call_provider(settings, advisor.build_messages(context, question, history, kind=self.kind))
+        text, references, invented = chat_context.clean_answer(raw, chat)
+        return advisor.ChatReply(text, references, demo=False, context_names=names, invented=invented)
+
+
+def service_for(kind: str, mode: str, db_path: Path | None = None, clock: Clock | None = None) -> ScholarPathService:
+    """The service for one opportunity type in one dataset."""
+    cls = InternshipService if kind == config.KIND_INTERNSHIP else ScholarPathService
+    return cls(mode, db_path=db_path, clock=clock)

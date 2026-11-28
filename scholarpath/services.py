@@ -612,7 +612,7 @@ class InternshipService(ScholarPathService):
                 seen = {rec.id for rec in accepted}
                 for source_name in sources_read or []:
                     report.marked_unavailable += repo.close_missing_internships(conn, source_name, seen)
-                for key, value in meta.items():
+                for key, value in (meta or {}).items():
                     repo.set_meta(conn, key, value)
                 repo.set_meta(conn, "internships_last_import_at", now)
                 self._insert_run(conn, started, report, "success", "")
@@ -628,9 +628,10 @@ class InternshipService(ScholarPathService):
         with connect(self.db_path) as conn:
             return repo.get_meta(conn, "internships_published_version")
 
-    def sync_published(self, path: Path = config.REAL_INTERNSHIPS_FILE) -> str:
+    def sync_published(self, path: Path | None = None) -> str:
         """Import the live finder's latest dataset once per version (Real dataset only).
         Returns "imported", "current" or "missing"; saved items and applications are untouched."""
+        path = path or config.REAL_INTERNSHIPS_FILE
         if self.mode != config.MODE_REAL or not Path(path).exists():
             return "missing"
         try:

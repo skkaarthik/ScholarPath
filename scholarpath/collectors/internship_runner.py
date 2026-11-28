@@ -132,8 +132,10 @@ def coverage(records: list[dict]) -> dict[str, int]:
     }
 
 
-def write_dataset(run: InternshipRun, path: Path = config.REAL_INTERNSHIPS_FILE) -> Path:
-    """Publish atomically. Refuses a run in which no board could be read."""
+def write_dataset(run: InternshipRun, path: Path | None = None) -> Path:
+    """Publish atomically (to config.REAL_INTERNSHIPS_FILE unless a path is given). Refuses a run in
+    which no board could be read."""
+    path = path or config.REAL_INTERNSHIPS_FILE   # looked up now, so tests' temporary folder applies
     if not run.succeeded:
         raise InternshipCollectionError("No internship source could be read; the previous dataset was kept unchanged.")
     payload = {

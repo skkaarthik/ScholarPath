@@ -75,6 +75,11 @@ class Application:
     created_at: str
     updated_at: str
 
+    @property
+    def item_id(self) -> str:
+        """The opportunity this entry tracks (a scholarship or an internship ID)."""
+        return self.scholarship_id
+
 
 def _parse_date(value) -> date | None:
     if value in (None, ""):
@@ -84,13 +89,17 @@ def _parse_date(value) -> date | None:
 
 def _to_application(row) -> Application:
     return Application(
-        id=row["id"], scholarship_id=row["scholarship_id"], status=row["status"],
+        id=row["id"], scholarship_id=row["item_id"], status=row["status"],
         target_date=_parse_date(row["target_date"]), submitted_date=_parse_date(row["submitted_date"]),
         outcome=row["outcome"], notes=row["notes"], created_at=row["created_at"], updated_at=row["updated_at"],
     )
 
 
 class ScholarPathService:
+    kind = "scholarship"
+    T = repo.SCHOLARSHIP_TABLES      # where this opportunity type keeps saved items and applications
+    noun = "scholarship"
+
     def __init__(self, mode: str, db_path: Path | None = None, clock: Clock | None = None):
         if mode not in config.MODES:
             raise ValueError(f"Unknown mode {mode!r}")
@@ -280,9 +289,14 @@ class ScholarPathService:
             ids = repo.search_ids(conn, filters or SearchFilters(), today, sort, self.now_iso())
             return [self._view(r, today) for r in repo.load_records(conn, ids)]
 
+    @staticmethod
+    def _load(conn, ids: list[str]) -> list:
+        """Full records for ``ids``, in that order (each opportunity type loads its own)."""
+        return repo.load_records(conn, ids)
+
     def get(self, scholarship_id: str) -> ScholarshipView | None:
         with connect(self.db_path) as conn:
-            records = repo.load_records(conn, [scholarship_id])
+            records = self._load(conn, [scholarship_id])
         return self._view(records[0], self.today()) if records else None
 
     # --- ScholarPath assistant (read-only: it never changes a record) -------------------------
@@ -348,28 +362,28 @@ class ScholarPathService:
     # --- shortlist ---------------------------------------------------------------
 
     def _require_scholarship(self, conn, scholarship_id: str) -> None:
-        if not repo.scholarship_exists(conn, scholarship_id):
-            raise ServiceError(f"Unknown scholarship ID {scholarship_id!r} in the {self.mode} dataset.")
+        if not repo.scholarship_exists(conn, scholarship_id, t=self.T):
+            raise ServiceError(f"Unknown {self.noun} ID {scholarship_id!r} in the {self.mode} dataset.")
 
     def save(self, scholarship_id: str) -> bool:
         """Add to shortlist. Returns False if it was already saved (no duplicate)."""
         with connect(self.db_path) as conn, transaction(conn):
             self._require_scholarship(conn, scholarship_id)
-            return repo.shortlist_add(conn, scholarship_id, config.utc_now_iso())
+            return repo.shortlist_add(conn, scholarship_id, config.utc_now_iso(), t=self.T)
 
     def unsave(self, scholarship_id: str) -> bool:
         """Remove from shortlist only. Any tracker entry and its history are kept."""
         with connect(self.db_path) as conn, transaction(conn):
-            return repo.shortlist_remove(conn, scholarship_id)
+            return repo.shortlist_remove(conn, scholarship_id, t=self.T)
 
     def saved_ids(self) -> list[str]:
         with connect(self.db_path) as conn:
-            return repo.shortlist_ids(conn)
+            return repo.shortlist_ids(conn, t=self.T)
 
     def shortlist(self) -> list[ScholarshipView]:
         today = self.today()
         with connect(self.db_path) as conn:
-            return [self._view(r, today) for r in repo.load_records(conn, repo.shortlist_ids(conn))]
+            return [self._view(r, today) for r in self._load(conn, repo.shortlist_ids(conn, t=self.T))]
 
     # --- tracker -----------------------------------------------------------------
 
@@ -401,11 +415,11 @@ class ScholarPathService:
         now = config.utc_now_iso()
         with connect(self.db_path) as conn, transaction(conn):
             self._require_scholarship(conn, scholarship_id)
-            existing = repo.application_for(conn, scholarship_id)
+            existing = repo.application_for(conn, scholarship_id, t=self.T)
             if existing is None:
-                app_id = repo.application_insert(conn, scholarship_id, "interested", now)
-                repo.history_insert(conn, app_id, {"status": "interested"}, "Started tracking", now)
-            row = repo.application_for(conn, scholarship_id)
+                app_id = repo.application_insert(conn, scholarship_id, "interested", now, t=self.T)
+                repo.history_insert(conn, app_id, {"status": "interested"}, "Started tracking", now, t=self.T)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
         return _to_application(row)
 
     def mark_applied(self, scholarship_id: str, submitted_date: date | None) -> Application:
@@ -420,13 +434,13 @@ class ScholarPathService:
         now = config.utc_now_iso()
         with connect(self.db_path) as conn, transaction(conn):
             self._require_scholarship(conn, scholarship_id)
-            row = repo.application_for(conn, scholarship_id)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
             if row is not None and row["status"] in ("applied", "result_received"):
                 return _to_application(row)
             errors = self.validate_application("applied", None, submitted_date, None, self.today())
             if errors:
                 raise ServiceError(" ".join(errors))  # leaves the transaction: nothing is written
-            app_id = row["id"] if row is not None else repo.application_insert(conn, scholarship_id, "applied", now)
+            app_id = row["id"] if row is not None else repo.application_insert(conn, scholarship_id, "applied", now, t=self.T)
             values = {
                 "status": "applied",
                 "target_date": row["target_date"] if row is not None else None,
@@ -434,9 +448,9 @@ class ScholarPathService:
                 "outcome": None,
                 "notes": row["notes"] if row is not None else "",
             }
-            repo.application_update(conn, app_id, values, now)
-            repo.history_insert(conn, app_id, values, "Marked as applied", now)
-            row = repo.application_for(conn, scholarship_id)
+            repo.application_update(conn, app_id, values, now, t=self.T)
+            repo.history_insert(conn, app_id, values, "Marked as applied", now, t=self.T)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
         return _to_application(row)
 
     def update_application(self, scholarship_id: str, status: str, target_date: date | None = None,
@@ -454,14 +468,14 @@ class ScholarPathService:
         }
         now = config.utc_now_iso()
         with connect(self.db_path) as conn, transaction(conn):
-            row = repo.application_for(conn, scholarship_id)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
             if row is None:
-                raise ServiceError("Start tracking this scholarship before editing it.")
+                raise ServiceError(f"Start tracking this {self.noun} before editing it.")
             if all(row[key] == value for key, value in values.items()) and not history_note.strip():
                 return _to_application(row)  # nothing changed: no write, no empty history entry
-            repo.application_update(conn, row["id"], values, now)
-            repo.history_insert(conn, row["id"], values, history_note or "Edited", now)
-            row = repo.application_for(conn, scholarship_id)
+            repo.application_update(conn, row["id"], values, now, t=self.T)
+            repo.history_insert(conn, row["id"], values, history_note or "Edited", now, t=self.T)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
         return _to_application(row)
 
     def remove_application(self, scholarship_id: str) -> bool:
@@ -471,25 +485,25 @@ class ScholarPathService:
         list are untouched. Returns False when there was no entry (e.g. a repeated click).
         """
         with connect(self.db_path) as conn, transaction(conn):
-            row = repo.application_for(conn, scholarship_id)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
             if row is None:
                 return False
-            repo.application_delete(conn, row["id"])
+            repo.application_delete(conn, row["id"], t=self.T)
         return True
 
     def get_application(self, scholarship_id: str) -> Application | None:
         with connect(self.db_path) as conn:
-            row = repo.application_for(conn, scholarship_id)
+            row = repo.application_for(conn, scholarship_id, t=self.T)
         return _to_application(row) if row else None
 
     def applications(self) -> list[Application]:
         with connect(self.db_path) as conn:
-            return [_to_application(r) for r in repo.application_list(conn)]
+            return [_to_application(r) for r in repo.application_list(conn, t=self.T)]
 
     def application_history(self, scholarship_id: str) -> list[dict]:
         with connect(self.db_path) as conn:
-            row = repo.application_for(conn, scholarship_id)
-            return [dict(r) for r in repo.history_for(conn, row["id"])] if row else []
+            row = repo.application_for(conn, scholarship_id, t=self.T)
+            return [dict(r) for r in repo.history_for(conn, row["id"], t=self.T)] if row else []
 
     # --- dashboard and matching ------------------------------------------------------
 
@@ -497,8 +511,9 @@ class ScholarPathService:
         """Saved or tracked scholarships, in non-overlapping deadline groups."""
         today = self.today()
         with connect(self.db_path) as conn:
-            ids = list(dict.fromkeys(repo.shortlist_ids(conn) + [r["scholarship_id"] for r in repo.application_list(conn)]))
-            views = [self._view(r, today) for r in repo.load_records(conn, ids)]
+            ids = list(dict.fromkeys(repo.shortlist_ids(conn, t=self.T)
+                                     + [r["item_id"] for r in repo.application_list(conn, t=self.T)]))
+            views = [self._view(r, today) for r in self._load(conn, ids)]
         groups: dict[str, list[ScholarshipView]] = {}
         for view in sorted(views, key=lambda v: (v.record.deadline_date or date.max, v.record.name)):
             groups.setdefault(view.group, []).append(view)

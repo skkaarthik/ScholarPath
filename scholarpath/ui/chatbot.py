@@ -34,6 +34,14 @@ STARTERS = {
     "default": ("Which scholarships fit me?", "Which scholarships close soonest?",
                 "How do I prepare a strong application?"),
 }
+I_STARTERS = {
+    "review": ("Do I meet what this internship asks for?", "How should I prepare for this internship?",
+               "What should I do next before applying?"),
+    "applications": ("Where do my applications stand?", "What should I do next for my applications?",
+                     "Which internships close soonest?"),
+    "default": ("Which internships fit me?", "Which paid internships are in Chennai?",
+                "How do I prepare a strong internship application?"),
+}
 ERROR_STYLE = {"quota": st.warning, "input": st.warning, "config": st.error, "unavailable": st.error}
 
 
@@ -80,7 +88,7 @@ def _context(svc, page: str) -> tuple[str | None, str]:
     view = svc.get(sid) if sid else None
     if view is not None:
         return view.record.id, view.record.name
-    return None, f"all scholarships in {config.MODE_LABELS.get(svc.mode, 'this dataset')}"
+    return None, f"all {common.WORDS[svc.kind]['nouns']} in {config.MODE_LABELS.get(svc.mode, 'this dataset')}"
 
 
 def _note_context_change(sid: str | None, label: str) -> None:
@@ -123,7 +131,7 @@ def _show(item: dict, index: int, page: str) -> None:
                            "Ignore that part; only the scholarships linked below are real records.",
                            icon=":material/warning:")
             if item.get("refs"):
-                st.caption("Scholarships in this answer")
+                st.caption(f"{common.words()['Nouns']} in this answer")
                 _references(item, index, page)
 
 
@@ -207,9 +215,12 @@ def body(page: str, in_fragment: bool = True) -> None:
                 _answer(svc, pending, sid, page)
                 st.rerun(scope="fragment" if in_fragment else "app")   # redraw with the reply's links
             if not log:
-                st.caption("Ask anything about scholarships, eligibility or your applications. For example:")
+                topic = ("internships, what employers ask for" if common.is_internship(svc)
+                         else "scholarships, eligibility")
+                st.caption(f"Ask anything about {topic} or your applications. For example:")
+                starters = I_STARTERS if common.is_internship(svc) else STARTERS
                 with st.container(key="chat_starters", gap="small"):
-                    for n, text in enumerate(STARTERS.get(page, STARTERS["default"])[:3]):
+                    for n, text in enumerate(starters.get(page, starters["default"])[:3]):
                         st.button(text, key=f"chat_starter_{n}", on_click=_ask, args=(text,), width="stretch")
 
     with st.container(key="chat_foot"):
@@ -237,4 +248,4 @@ def entry(page: str) -> None:
     else:
         with st.container(key="chat_fab"):
             st.button("Ask ScholarPath", key="chat_open_btn", on_click=_open, icon=":material/forum:",
-                      help="Ask the ScholarPath assistant about scholarships, eligibility or your applications")
+                      help=f"Ask the ScholarPath assistant about {common.words()['nouns']} or your applications")

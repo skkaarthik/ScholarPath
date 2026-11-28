@@ -32,8 +32,12 @@ def seeded(example_records):
     return service
 
 
-def run_app() -> AppTest:
+def run_app(kind: str | None = "scholarship") -> AppTest:
+    """Open the app. v2 asks first whether the student wants internships or scholarships; the v1
+    tests below start as a student who chose scholarships (tests/test_v2_ui.py covers the choice)."""
     at = AppTest.from_file(APP, default_timeout=30)
+    if kind:
+        at.session_state["kind"] = kind
     at.run()
     assert not at.exception, at.exception
     return at

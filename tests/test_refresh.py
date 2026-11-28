@@ -276,6 +276,7 @@ def test_the_running_app_shows_a_newly_published_dataset_without_manual_steps(mo
     publish_records(target, [rec("a", name="First Published Award")])
     at = AppTest.from_file(APP, default_timeout=30)
     at.session_state["mode"] = config.MODE_REAL
+    at.session_state["kind"] = config.KIND_SCHOLARSHIP      # v2: the student chose scholarships
     at.run()
     assert not at.exception, at.exception
     assert "First Published Award" in [s.value for s in at.subheader]

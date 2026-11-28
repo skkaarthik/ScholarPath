@@ -397,8 +397,8 @@ def validate_internship(raw: dict[str, Any]) -> InternshipRecord:
     arrangement = raw.get("work_arrangement") or "unknown"
     if arrangement not in WORK_ARRANGEMENTS:
         errors.append(f"work_arrangement: must be one of {list(WORK_ARRANGEMENTS)}")
-    if not cities and not states and arrangement != "remote":
-        errors.append("location: an Indian city, a state or a remote arrangement is required")
+    # No city or state is allowed: the posting then says only "India" and is shown as
+    # "India (city not stated)"; it appears under All India, never under a city.
 
     expected_id = internship_id(employer, title, cities, arrangement) if employer and title else None
     record_id = clean_text(raw.get("id")) or expected_id

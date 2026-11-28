@@ -8,6 +8,25 @@ scholarships and planning applications:
 It is a college semester project. It does not submit applications, predict who wins,
 generate essays, send emails, store documents or convert currencies.
 
+## Internships (v2)
+
+On first arrival ScholarPath asks whether you want to **find internships** or **find scholarships**.
+Internships use the same screens, buttons and steps (Find, Review, Save, Mark as applied, Track,
+Check my fit, Insights, Data & sources, the assistant), with Chennai and Bengaluru first, quick
+choices for Chennai, Bengaluru, All India and Remote, and filters for city, state or union
+territory, work arrangement, discipline, stipend and deadline. Switch at any time with
+*Looking for: Internships | Scholarships* under the menu (or in More); each type keeps its own
+search, Saved list and Applications.
+
+Real internships come from employers' public job boards (Greenhouse and Lever):
+
+```bash
+python -m scholarpath find-internships --dry-run   # read every board live and report coverage
+python -m scholarpath find-internships --import    # publish and import into the real database
+```
+
+See docs/UPGRADE_STATUS.md for the sources, their live coverage and the known gaps.
+
 ## Features
 
 - **Two isolated datasets**, each with its own SQLite database, saved list and tracker:

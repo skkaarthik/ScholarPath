@@ -90,3 +90,29 @@ allow-list, a 20-second timeout, a 2-second delay between requests and up to 3 a
 for transient errors. It is tested with fake HTTP responses only. Running
 `python -m scholarpath collect --live` on a machine with normal internet access is the way to
 check it; if the site layout has changed, the parser reports which section is missing.
+
+
+## Internship sources (v2)
+
+The live internship finder (`collectors/internship_sources.py`, `python -m scholarpath find-internships`)
+reads employers' public job-board APIs. Both are official, documented, read-only and keyless, and
+robots.txt allows them:
+
+* **Greenhouse Job Board API** - `https://boards-api.greenhouse.io/v1/boards/<board>/jobs?content=true`
+* **Lever Postings API** - `https://api.lever.co/v0/postings/<company>?mode=json`
+
+Each employer board is its own source in the status table. Boards are listed Chennai first, then
+Bengaluru, then the rest of India. Only facts are kept (role, employer, place, arrangement, stipend,
+duration, degree, year of study, experience, deadline, links), never the posting's description text.
+
+Checked and **not used** (28 Nov 2026):
+
+| Source | Why not |
+|---|---|
+| AICTE Internship Portal | Listings are loaded from `/api/`, which robots.txt disallows; the pages hold no listings |
+| Internshala | robots.txt disallows internship search and detail pages for all crawlers |
+| National Career Service | Job search needs an account |
+| SmartRecruiters (e.g. Freshworks, Chennai) | robots.txt disallows the postings API |
+| Aggregators (Indeed, Glassdoor, Jooble ...) | No published API for this use |
+
+Live result of 28 Nov 2026: see docs/UPGRADE_STATUS.md (19 of 20 boards read; 34 internships in India).

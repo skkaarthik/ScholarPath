@@ -20,6 +20,16 @@ validates and writes `data/collected/real_scholarships.json` → `import-real`
 - Closing is decided by `dates.closes_at`/`is_closed` (source time zone; Anywhere on Earth when
   unknown). Closed records leave discovery but are never deleted.
 
+## Opportunity types (v2)
+- Internships and scholarships share every screen. `common.current_kind()` is the chosen type
+  (never call it "mode": `mode` is the Example/Real dataset). `common.service()` returns
+  `ScholarPathService` or `InternshipService` for the type.
+- Internships have their own tables (migration v4) and their own saved list and applications; the
+  repository's user-data functions take the table set (`SCHOLARSHIP_TABLES`, `INTERNSHIP_TABLES`).
+- Canonical internship record: `models.InternshipRecord`, validated by `cleaning.validate_internship`;
+  ID `models.internship_id(employer, title, cities, arrangement)`. Places via `locations.py`.
+- Live internships change only via `find-internships`; facts only, never description text.
+
 ## Data rules
 - Canonical record: `models.ScholarshipRecord`; validate with `cleaning.validate_record`.
 - Criteria use `{"kind": "unrestricted"|"list"|"unknown", "values": [...]}`.
@@ -41,6 +51,7 @@ python -m pytest                       # all tests (offline, temp DBs, fixed dat
 python -m scholarpath init-examples    # fictional data -> example DB
 python -m scholarpath collect --from-snapshots | --live
 python -m scholarpath import-real
+python -m scholarpath find-internships --dry-run | --import   # live internship finder
 streamlit run app.py
 ```
 

@@ -65,10 +65,20 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
           python -m scholarpath refresh "${args[@]}"
 
+      # v2: internships change daily, so the live finder runs on every scheduled day. A board that
+      # fails keeps its last records; a run in which no board answers publishes nothing.
+      - name: Find internships (live job boards)
+        id: internships
+        continue-on-error: true
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then python -m scholarpath find-internships --dry-run; else python -m scholarpath find-internships; fi
+
       - name: Commit the refreshed data (only if a file actually changed)
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
         run: |
-          for f in data/collected/real_scholarships.json data/refresh/state.json; do
+          for f in data/collected/real_scholarships.json data/refresh/state.json data/collected/real_internships.json; do
             if [ -e "$f" ]; then git add "$f"; fi
           done
           if git diff --cached --quiet; then
@@ -77,7 +87,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Refresh scholarship data ($(date -u +%Y-%m-%d))"
+          git commit -m "Refresh scholarship and internship data ($(date -u +%Y-%m-%d))"
           git push
 
       - name: Report a failed refresh

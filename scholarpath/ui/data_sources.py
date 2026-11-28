@@ -53,11 +53,57 @@ def _dataset_card(svc) -> None:
     other = config.MODE_REAL if svc.mode == config.MODE_EXAMPLE else config.MODE_EXAMPLE
     with st.container(border=True, key="card_dataset"):
         st.subheader(f"Showing: {config.MODE_LABELS[svc.mode]}", anchor=False)
-        st.markdown(EXPLAIN[svc.mode])
+        st.markdown((I_EXPLAIN if common.is_internship(svc) else EXPLAIN)[svc.mode])
         st.button(f"Switch to {config.MODE_LABELS[other]}", key="data_switch", on_click=common.switch_mode,
                   args=(other,), icon=":material/swap_horiz:")
         st.caption("Each dataset has its own database, saved list and applications. Nothing is shared "
                    "between them, and switching never changes either one.")
+
+
+I_EXPLAIN = {
+    config.MODE_EXAMPLE: "Sixteen invented internships with deadlines generated around a fixed date, so every part "
+                         "of the app can be tried safely. None of them exist.",
+    config.MODE_REAL: "Internships read live from employers' public job boards (Greenhouse and Lever) by "
+                      "ScholarPath's internship finder. Each record keeps the board it came from and when it was "
+                      "last checked.",
+}
+I_COMMANDS = {
+    config.MODE_EXAMPLE: "python -m scholarpath init-examples",
+    config.MODE_REAL: "python -m scholarpath find-internships --import   # read every job board live, publish, import\n"
+                      "python -m scholarpath find-internships --dry-run  # read and report coverage, write nothing",
+}
+
+
+def _finder_status(svc, info: dict) -> None:
+    """The live finder's latest run: every board, whether it was read, what it gave, when it last worked."""
+    st.header("Live internship finder", anchor=False)
+    sources = info.get("sources") or []
+    if not sources:
+        st.markdown("The live finder has not been run for this dataset yet.")
+        st.code(I_COMMANDS[config.MODE_REAL], language=None)
+        return
+    failed = [s for s in sources if s.get("status") != "ok"]
+    st.markdown(f"**Latest run:** {common.fmt_ts(info.get('newest_fetched'))} · "
+                f"{len(sources) - len(failed)} of {len(sources)} job boards read")
+    if failed:
+        st.warning(f"{common.plural(len(failed), 'job board')} could not be read in the latest run. Their "
+                   "internships from the last successful run are still shown.", icon=":material/warning:")
+    st.dataframe(pd.DataFrame([{
+        "Job board": s["source_name"],
+        "Latest run": "Read" if s.get("status") == "ok" else "Failed",
+        "Postings on the board": s.get("listed") if s.get("listed") is not None else "-",
+        "Internships in India": s.get("internships", 0),
+        "Last success": _when(s.get("last_success_at")),
+        "Problem": s.get("error") or "",
+    } for s in sources]), hide_index=True, key="data_finder_sources")
+    cover = svc.coverage()
+    with st.container(horizontal=True, key="facts_coverage"):
+        st.metric("Chennai", cover["chennai"], border=True)
+        st.metric("Bengaluru", cover["bengaluru"], border=True)
+        st.metric("Rest of India", cover["rest_of_india"], border=True)
+        st.metric("Remote", cover["remote"], border=True)
+    st.caption("Open internships by place. One internship in several places counts in each. Postings a job board "
+               "no longer lists are marked closed at the next run and stay in Saved and Applications.")
 
 
 def _sources(views) -> None:
@@ -65,6 +111,7 @@ def _sources(views) -> None:
     by_source = defaultdict(list)
     for view in views:
         by_source[view.record.source_name].append(view.record)
+    internship = bool(views) and hasattr(views[0].record, "employer")
     st.dataframe(pd.DataFrame([{
         "Source": name,
         "Records": len(records),
@@ -78,7 +125,7 @@ def _sources(views) -> None:
                      icon=":material/link:"):
         st.dataframe(
             pd.DataFrame([{
-                "Scholarship": v.record.name,
+                ("Internship" if internship else "Scholarship"): v.record.name,
                 "Source page": v.record.source_url,
                 "Page read on": common.fmt_date(_read_day(v.record)),
                 "Checked by a person": "Yes" if v.record.manual_verified_at else "Not yet",
@@ -139,12 +186,18 @@ def _trust(svc, info: dict) -> None:
     st.header("How far to trust it", anchor=False)
     checked, total = info["verified_count"], info["scholarships"]
     lines = [
-        "**Read** is the day ScholarPath collected a page, not the day the provider published or updated it. "
-        "A deadline that was correct then may have changed since.",
+        ("**Last checked** is when ScholarPath last read the employer's job board. Job boards remove postings "
+         "when a role is filled, so check the employer's page before applying." if common.is_internship(svc) else
+         "**Read** is the day ScholarPath collected a page, not the day the provider published or updated it. "
+         "A deadline that was correct then may have changed since."),
         (f"**Checked by a person: {checked} of {total}.** Collecting a page is not verification; a record "
          "counts as checked only after someone compares it with the official page."),
     ]
-    if svc.mode == config.MODE_REAL:
+    if svc.mode == config.MODE_REAL and common.is_internship(svc):
+        lines.append("Each internship keeps facts only (role, employer, place, stipend, duration, deadline and the "
+                     "requirements it states), never the employer's description text. The discipline is "
+                     "ScholarPath's reading of the role title.")
+    elif svc.mode == config.MODE_REAL:
         lines.append("Each record says how it was read: from a saved copy of the official page, or downloaded "
                      "directly by the refresh. Either way, it shows the page as it was on that day, not live.")
     else:
@@ -169,14 +222,19 @@ def _technical(svc, info: dict) -> None:
             f"- **Source pages read between:** {common.fmt_ts(info['oldest_fetched'])} and "
             f"{common.fmt_ts(info['newest_fetched'])}"
         )
-        st.markdown("Nothing is collected while you browse. "
-                    + ("The real dataset changes only through the refresh command: on a schedule in GitHub "
-                       "Actions (once activated), or when you run it in Terminal inside the ScholarPath folder. "
-                       "A successful refresh is picked up by the app automatically."
-                       if svc.mode == config.MODE_REAL else
-                       "The example dataset is rebuilt only by this command, run in Terminal inside the "
-                       "ScholarPath folder; reload this page afterwards."))
-        st.code(COMMANDS[svc.mode], language=None)
+        if common.is_internship(svc) and svc.mode == config.MODE_REAL:
+            how = ("Real internships change only through the live finder command, run in Terminal inside the "
+                   "ScholarPath folder (or by the daily GitHub workflow, once activated). A new run is picked up "
+                   "by the app automatically.")
+        elif svc.mode == config.MODE_REAL:
+            how = ("The real dataset changes only through the refresh command: on a schedule in GitHub "
+                   "Actions (once activated), or when you run it in Terminal inside the ScholarPath folder. "
+                   "A successful refresh is picked up by the app automatically.")
+        else:
+            how = ("The example dataset is rebuilt only by this command, run in Terminal inside the "
+                   "ScholarPath folder; reload this page afterwards.")
+        st.markdown("Nothing is collected while you browse. " + how)
+        st.code((I_COMMANDS if common.is_internship(svc) else COMMANDS)[svc.mode], language=None)
         st.caption(f"Database file: {svc.db_path}")
 
 
@@ -186,20 +244,24 @@ def render(svc) -> None:
     _dataset_card(svc)
     if not common.dataset_ready(svc):
         return
-    info = common.cached_overview(str(svc.db_path), svc.today().isoformat())
+    info = common.cached_overview(str(svc.db_path), svc.today().isoformat(), svc.kind)
     views = common.all_views(svc, "name", include_closed=True)   # this page describes the whole dataset
+    w = common.WORDS[svc.kind]
 
     with st.container(horizontal=True, key="facts_data"):
         st.metric("Open now", info["active"], border=True,
-                  help="Shown in Find Scholarships: not closed (rolling and unconfirmed dates included)")
+                  help=f"Shown in {w['find']}: not closed (rolling and unconfirmed dates included)")
         st.metric("All records", info["scholarships"], border=True,
                   help="Including closed ones, which are kept for saved items and applications")
         st.metric("Sources", len({v.record.source_name for v in views}), border=True)
         st.metric("Checked by hand", f"{info['verified_count']} of {info['scholarships']}", border=True,
                   help="Records a person has compared with the official page")
-        st.metric("Pages unavailable", info["unavailable_count"], border=True)
+        st.metric("No longer listed" if common.is_internship(svc) else "Pages unavailable", info["unavailable_count"],
+                  border=True)
 
-    if svc.mode == config.MODE_REAL:
+    if svc.mode == config.MODE_REAL and common.is_internship(svc):
+        _finder_status(svc, info)
+    elif svc.mode == config.MODE_REAL:
         _refresh_status(svc)
     _sources(views)
     _trust(svc, info)

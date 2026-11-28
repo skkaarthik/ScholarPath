@@ -1,0 +1,60 @@
+{
+  "note": "Live capture, 28 Nov 2026 ~18:55 IST, read through the built-in browser on Kaarthik's Mac (the cloud workspace and the Mac's VM cannot reach the job boards). Each board's API URL was fetched once; listed = postings on the board; rows = every posting the finder's intern test keeps (title or Lever work type), as [board, title, location, other locations, workplaceType/company, country, commitment]. Facts only.",
+  "greenhouse": {
+    "listed": {"fourkites": 11, "toast": 298, "episodesix": 16, "zuora": 44, "devrev": 2, "commerceiq": 14, "enterpret": 16, "karya": 22, "hackerrank": 32, "interviewkickstart": "HTTP 404"},
+    "rows": [
+      ["fourkites", "Intern - Community & Documentation", "Chennai", "Chennai", "", "", ""],
+      ["episodesix", "Graduate Trainee- Security", "India", "India", "", "", ""],
+      ["enterpret", "[Backend, Onsite] Software Engineering Intern", "Bengaluru, Onsite", "Bangalore", "", "", ""],
+      ["enterpret", "Machine Learning Intern", "Bengaluru", "Bangalore", "", "", ""],
+      ["karya", "Research Engineering Intern, AI Evaluations", "Bengaluru, India", "Bangalore Office", "", "", ""],
+      ["karya", "Research Intern - AI Evaluations", "Bengaluru", "Bangalore Office", "", "", ""],
+      ["hackerrank", "AI Researcher Intern", "Onsite in Bangalore", "Hybrid in Bengaluru, India", "", "", ""],
+      ["hackerrank", "Software Development Engineer Intern", "Onsite in Bangalore", "Hybrid in Bengaluru, India", "", "", ""]
+    ]
+  },
+  "lever": {
+    "listed": {"portcast": 7, "shopback-2": 61, "paytm": 198, "paytmpayments": 1151, "dnb": 93, "fampay": 13, "epifi": 0, "zeta": 38, "Sprinto": 29, "stable-money1": 16},
+    "rows": [
+      ["portcast", "Data Analyst Intern", "Singapore", "Singapore/Bangalore/Chennai/Delhi/Hyderabad/Kolkata/Mumbai/Cebu/Manila/Bangkok/Hanoi/Ho Chi Minh", "remote", "SG", "Intern"],
+      ["shopback-2", "Business & Strategy Analyst Intern (Regional Payments)", "Singapore, Singapore", "Singapore, Singapore", "onsite", "SG", "Intern"],
+      ["shopback-2", "Data Analyst (Internship) (H1 2027)", "Singapore, Singapore", "Singapore, Singapore", "onsite", "SG", "Intern"],
+      ["shopback-2", "IT Support Intern", "Singapore, Singapore", "Singapore, Singapore", "onsite", "SG", "Intern"],
+      ["shopback-2", "Marketing Intern (Campaigns)", "Singapore, Singapore", "Singapore, Singapore", "onsite", "SG", "Intern"],
+      ["shopback-2", "Software Engineer Intern", "San Francisco, California", "San Francisco, California", "remote", "US", "Intern"],
+      ["shopback-2", "Software Engineer Intern", "New York City, New York", "New York City, New York", "remote", "US", "Intern"],
+      ["shopback-2", "Software Engineer Intern - Backend", "Ho Chi Minh, Vietnam", "Ho Chi Minh, Vietnam", "onsite", "VN", "Intern"],
+      ["shopback-2", "Software Engineer Intern - QA", "Taipei, Taiwan", "Taipei, Taiwan", "onsite", "TW", "Intern"],
+      ["shopback-2", "Software Engineer Intern (H1 2027)", "Singapore, Singapore", "Singapore, Singapore", "onsite", "SG", "Intern"],
+      ["shopback-2", "Sports Partnerships Marketing Intern", "Texas, United States", "Texas, United States", "onsite", "US", "Intern"],
+      ["paytm", "Intern - Talent Acquisition", "Gurugram, Haryana", "Gurugram, Haryana/Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytm", "Intern- HR Onboarding", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytm", "Intern-Talent Acquisition", "Bangalore, Karnataka", "Bangalore, Karnataka", "onsite", "IN", "Intern"],
+      ["paytm", "Learning Experience Design Intern", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytm", "Talent  Acquisition Internship", "Gurugram, Haryana", "Gurugram, Haryana", "hybrid", "IN", "Intern"],
+      ["paytm", "Talent Acquisition Intern", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytm", "Talent Acquisition Intern - Bangalore", "Bangalore, Karnataka", "Bangalore, Karnataka", "onsite", "IN", "Intern"],
+      ["paytm", "Talent Acquisition Intern - IT Recruitment", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytm", "Talent Acquisition Intern- Product  hiring", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", ""],
+      ["paytmpayments", "HR Intern", "Pune, Maharashtra", "Pune, Maharashtra", "onsite", "IN", "Intern"],
+      ["paytmpayments", "HR recruitment - Intern", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "hybrid", "IN", "On- roll"],
+      ["paytmpayments", "Human Resources-Intern- Noida", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytmpayments", "Intern - Secretarial Compliance - 598", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["paytmpayments", "Intern:Intern:Talent Aquisition:bengaluru", "Bangalore, Karnataka", "Bangalore, Karnataka", "onsite", "IN", "Intern"],
+      ["paytmpayments", "Intern:Intern:Talent Aquisition:Noida", "Noida, Uttar Pradesh", "Noida, Uttar Pradesh", "onsite", "IN", "Intern"],
+      ["dnb", "AI Engineer (R-20123)", "Dublin - Ireland", "Dublin - Ireland", "hybrid", "IE", "Intern: Full Time"],
+      ["dnb", "Apprentice (R-20025)", "Mumbai - India", "Mumbai - India", "onsite", "IN", "Apprentice"],
+      ["dnb", "Intern (R-20146)", "Mumbai - India", "Mumbai - India", "onsite", "IN", "Intern: Full Time"],
+      ["dnb", "Software Engineer (R-20124)", "Dublin - Ireland", "Dublin - Ireland", "hybrid", "IE", "Intern: Full Time"],
+      ["fampay", "Backend Engineering Intern", "Bengaluru", "Bengaluru", "onsite", "IN", "Intern"],
+      ["fampay", "People Operations Intern", "Bengaluru", "Bengaluru", "onsite", "IN", "Intern"],
+      ["fampay", "Security Engineer Intern", "Bengaluru", "Bengaluru", "onsite", "IN", "Full Time"],
+      ["zeta", "Intern", "Bangalore - WF", "Bangalore - WF", "onsite", "IN", "Intern"],
+      ["Sprinto", "Field Sales Intern", "San Francisco Bay Area", "San Francisco Bay Area", "hybrid", "US", "Remote"],
+      ["Sprinto", "Finance Intern - Remote", "Remote (India)", "Remote (India)", "remote", "IN", "Remote"],
+      ["Sprinto", "Revenue & Operations Intern", "Bengaluru", "Bengaluru", "remote", "IN", "Remote"],
+      ["stable-money1", "Business Intern - CC", "Bengaluru", "Bengaluru", "onsite", "IN", "Intern"],
+      ["stable-money1", "Finance Trainee (CA Industrial Training)", "Bengaluru", "Bengaluru", "onsite", "IN", "Contract"]
+    ]
+  }
+}

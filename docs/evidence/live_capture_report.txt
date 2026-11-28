@@ -1,0 +1,56 @@
+ok     FourKites (Greenhouse job board)              listed=11    internships_in_india=1
+ok     Toast (Greenhouse job board)                  listed=298   internships_in_india=0
+ok     Episode Six (Greenhouse job board)            listed=16    internships_in_india=1
+ok     Zuora (Greenhouse job board)                  listed=44    internships_in_india=0
+ok     Portcast (Lever job board)                    listed=7     internships_in_india=1
+ok     ShopBack (Lever job board)                    listed=61    internships_in_india=0
+ok     Paytm (Lever job board)                       listed=198   internships_in_india=9
+ok     Paytm Payments Services (Lever job board)     listed=1151  internships_in_india=6
+ok     Dun & Bradstreet (Lever job board)            listed=93    internships_in_india=2
+ok     DevRev (Greenhouse job board)                 listed=2     internships_in_india=0
+ok     CommerceIQ (Greenhouse job board)             listed=14    internships_in_india=0
+ok     Enterpret (Greenhouse job board)              listed=16    internships_in_india=2
+ok     Karya (Greenhouse job board)                  listed=22    internships_in_india=2
+ok     HackerRank (Greenhouse job board)             listed=32    internships_in_india=2
+failed Interview Kickstart (Greenhouse job board)    listed=None  internships_in_india=0  (https://boards-api.greenhouse.io/v1/boards/interviewkickstart/jobs?content=true: HTTP 404)
+ok     FamPay (Lever job board)                      listed=13    internships_in_india=3
+ok     Fi (epiFi) (Lever job board)                  listed=0     internships_in_india=0
+ok     Zeta (Lever job board)                        listed=38    internships_in_india=1
+ok     Sprinto (Lever job board)                     listed=29    internships_in_india=2
+ok     Stable Money (Lever job board)                listed=16    internships_in_india=2
+duplicates merged: 0 | rejected: 0
+coverage: {'unique': 34, 'chennai': 2, 'bengaluru': 17, 'rest_of_india': 16, 'remote': 3}
+  Bengaluru: AI Researcher Intern - HackerRank [onsite]
+  Bengaluru: Backend Engineering Intern - FamPay [onsite]
+  Bengaluru: Business Intern - CC - Stable Money [onsite]
+  Bengaluru: Finance Trainee (CA Industrial Training) - Stable Money [onsite]
+  Bengaluru: Intern - Zeta [onsite]
+  Bengaluru: Intern-Talent Acquisition - Paytm [onsite]
+  Bengaluru: Intern:Intern:Talent Aquisition:bengaluru - Paytm Payments Services [onsite]
+  Bengaluru: Machine Learning Intern - Enterpret [unknown]
+  Bengaluru: People Operations Intern - FamPay [onsite]
+  Bengaluru: Research Engineering Intern, AI Evaluations - Karya [onsite]
+  Bengaluru: Research Intern - AI Evaluations - Karya [onsite]
+  Bengaluru: Revenue & Operations Intern - Sprinto [remote]
+  Bengaluru: Security Engineer Intern - FamPay [onsite]
+  Bengaluru: Software Development Engineer Intern - HackerRank [onsite]
+  Bengaluru: Talent Acquisition Intern - Bangalore - Paytm [onsite]
+  Bengaluru: [Backend, Onsite] Software Engineering Intern - Enterpret [onsite]
+  Chennai, Bengaluru, Delhi NCR, Hyderabad, Kolkata, Mumbai: Data Analyst Intern - Portcast [remote]
+  Chennai: Intern - Community & Documentation - FourKites [unknown]
+  Delhi NCR: HR recruitment - Intern - Paytm Payments Services [hybrid]
+  Delhi NCR: Human Resources-Intern- Noida - Paytm Payments Services [onsite]
+  Delhi NCR: Intern - Secretarial Compliance - 598 - Paytm Payments Services [onsite]
+  Delhi NCR: Intern - Talent Acquisition - Paytm [onsite]
+  Delhi NCR: Intern- HR Onboarding - Paytm [onsite]
+  Delhi NCR: Intern:Intern:Talent Aquisition:Noida - Paytm Payments Services [onsite]
+  Delhi NCR: Learning Experience Design Intern - Paytm [onsite]
+  Delhi NCR: Talent  Acquisition Internship - Paytm [hybrid]
+  Delhi NCR: Talent Acquisition Intern - Paytm [onsite]
+  Delhi NCR: Talent Acquisition Intern - IT Recruitment - Paytm [onsite]
+  Delhi NCR: Talent Acquisition Intern- Product  hiring - Paytm [onsite]
+  Mumbai: Apprentice (R-20025) - Dun & Bradstreet [onsite]
+  Mumbai: Intern (R-20146) - Dun & Bradstreet [onsite]
+  Pune: HR Intern - Paytm Payments Services [onsite]
+  Remote: Finance Intern - Remote - Sprinto [remote]
+  India: Graduate Trainee- Security - Episode Six [unknown]
